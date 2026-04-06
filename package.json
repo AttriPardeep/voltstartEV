@@ -1,0 +1,13 @@
+{
+  "name": "voltstartev",
+  "private": true,
+  "workspaces": [
+    "admin",
+    "mobile",
+    "shared"
+  ],
+  "scripts": {
+    "admin": "npm run dev --workspace=admin",
+    "mobile": "npm run start --workspace=mobile"
+  }
+}
