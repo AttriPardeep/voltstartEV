@@ -31,6 +31,30 @@ const POWER_OPTIONS = [
 ];
 
 // ── Stable marker component ───────────────────────────
+/* TODO this is not allowing charger icon on map 
+const ChargerMarker = React.memo(({
+  charger, onPress
+}: { charger: Charger; onPress: (c: Charger) => void }) => {
+  const color = STATUS_COLOR[charger.status] || '#6b7280';
+  const isAvailable = charger.status === 'Available';
+  return (
+    <Marker
+      coordinate={{ latitude: charger.latitude, longitude: charger.longitude }}
+      onPress={() => onPress(charger)}
+      tracksViewChanges={false}
+    >
+      <View style={[mk.pin, { borderColor: color,
+        backgroundColor: isAvailable ? '#14532d' : '#1e293b' }]}>
+        <Text style={mk.icon}>⚡</Text>
+        <Text style={[mk.label, { color }]}>
+          {charger.availableConnectors}/{charger.totalConnectors}
+        </Text>
+      </View>
+    </Marker>
+  );
+});
+*/
+
 const ChargerMarker = React.memo(({
   charger, onPress
 }: { charger: Charger; onPress: (c: Charger) => void }) => {
@@ -154,9 +178,8 @@ export default function MapScreen() {
     return () => clearInterval(interval);
   }, []);
 
-  //  Guard the fitToCoordinates effect with optional chaining
   useEffect(() => {
-    if (!filteredChargers?.length || !mapRef.current) return;
+    if (filteredChargers.length === 0 || !mapRef.current) return;
     
     setTimeout(() => {
       mapRef.current?.fitToCoordinates(
@@ -170,10 +193,10 @@ export default function MapScreen() {
         }
       );
     }, 500);
-  }, [filteredChargers?.length]);  // ✅ Also use optional chaining in dependency
+  }, [filteredChargers.length]);
  
-  //  Guard filteredChargers computation - chargers might be undefined on first render
-  const filteredChargers = (chargers || []).filter(c => {
+ // Apply filters
+  const filteredChargers = chargers.filter(c => {
     if (filters.availability === 'available' && c.status !== 'Available')
       return false;
     if (filters.minPower > 0 && (c.maxPower || 0) / 1000 < filters.minPower)
@@ -227,25 +250,16 @@ export default function MapScreen() {
       Alert.alert('✅ Charging Started',
         `Session started on ${selected.chargeBoxId} Connector ${selectedConnector}`);
       fetchActiveSession();
-      } catch (err: any) {
-        const isTimeout = err?.code === 'ECONNABORTED' 
-          || err?.message?.includes('timeout')
-          || err?.message?.includes('Network Error');
-        
-        Alert.alert(
-          isTimeout ? '⏳ Connecting to Charger...' : 'Failed',
-          isTimeout
-            ? 'The charger is responding. Check the Session tab in 30 seconds — your charging session may have already started.'
-            : err?.response?.data?.error || err?.message || 'Could not start session',
-          isTimeout ? [
-            { text: 'Check Session Tab', onPress: () => {
-              setModalVisible(false);
-              // navigate to session tab if possible
-            }},
-            { text: 'OK' }
-          ] : [{ text: 'OK' }]
-        );
-      } finally {
+    } catch (err: any) {
+      const isTimeout = err?.code === 'ECONNABORTED'
+        || err?.message?.includes('timeout');
+      Alert.alert(
+        isTimeout ? '⏳ Taking longer than expected' : 'Failed',
+        isTimeout
+          ? 'Check the Session tab in 30 seconds — your session may have started.'
+          : err?.response?.data?.error || err?.message || 'Could not start session'
+      );
+    } finally {
       setStarting(false);
       startingRef.current = false;
     }
@@ -283,7 +297,7 @@ export default function MapScreen() {
 
         <View style={styles.countBadge}>
           <Text style={styles.countTxt}>
-            {filteredChargers.length}/{chargers?.length || 0} chargers  {/* ✅ Guard chargers.length too */}
+            {filteredChargers.length}/{chargers.length} chargers
           </Text>
         </View>
       </View>

@@ -1,21 +1,24 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "VoltStartEV",
+    "slug": "voltstartev",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "jsEngine": "hermes",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.voltstartev.mobile"
     },
     "android": {
+      "package": "com.voltstartev.mobile",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -26,11 +29,21 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-	"expo": {
-      "jsEngine": "hermes"
-    },
     "plugins": [
-      "expo-build-properties"
-    ]
+      "expo-build-properties",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#22d3ee",
+          "sounds": []
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "2933bc15-43df-46a4-a1ad-b043ec8f578f"
+      }
+    }
   }
 }

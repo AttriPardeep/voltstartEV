@@ -2,6 +2,7 @@
 import { create } from 'zustand';
 import { api, API_BASE } from '../utils/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { showLocalNotification } from '../services/notifications';
 
 //  Add steveTransactionPk to Session interface
 export interface Session {
@@ -73,13 +74,16 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       set({ activeSession: null });
     }
   },
-
+/*
   startSession: async (chargeBoxId, connectorId, idTag) => {
     set({ isLoading: true });
     try {
       const token = await AsyncStorage.getItem('auth_token');
       console.log('Token present:', !!token, 'Length:', token?.length);
-      const res = await api.post('/api/charging/start', { chargeBoxId, connectorId, idTag });
+	  const res = await api.post('/api/charging/start', 
+	    { chargeBoxId, connectorId, idTag },
+	    { timeout: 40000 } // SteVe can take 40s to get charger response
+	  );
       set({ isLoading: false });
       return res.data;
     } catch (err) {
@@ -87,7 +91,30 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       throw err;
     }
   },
-
+*/
+  startSession: async (chargeBoxId, connectorId, idTag) => {
+    set({ isLoading: true });
+    try {
+      const token = await AsyncStorage.getItem('auth_token');
+      const res = await api.post('/api/charging/start', 
+        { chargeBoxId, connectorId, idTag },
+        { timeout: 40000 }
+      );
+      set({ isLoading: false });
+  
+      // Local notification — works in Expo Go
+      showLocalNotification(
+        '⚡ Charging Started!',
+        `${chargeBoxId} · Connector ${connectorId} · Session active`,
+        { action: 'view_session' }
+      );
+  
+      return res.data;
+    } catch (err) {
+      set({ isLoading: false });
+      throw err;
+    }
+  },
   //  Send chargeBoxId + transactionId instead of sessionId
   stopSession: async (sessionId) => {
     set({ isLoading: true });
@@ -96,10 +123,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       const { activeSession } = get();
       if (!activeSession) throw new Error('No active session to stop');
       
-      await api.post('/api/charging/stop', { 
-        chargeBoxId: activeSession.chargeBoxId,
-        transactionId: activeSession.steveTransactionPk,  //  Use SteVe transaction PK
-      });
+      await api.post(
+        '/api/charging/stop',
+        { chargeBoxId: activeSession.chargeBoxId,
+          transactionId: activeSession.steveTransactionPk },
+        { timeout: 40000 } 
+      );
       
       set({ activeSession: null, telemetry: null, isLoading: false });
     } catch (err) {

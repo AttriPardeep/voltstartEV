@@ -6,7 +6,7 @@ export const API_BASE = 'http://136.113.7.146:3000';
 
 export const api = axios.create({
   baseURL: API_BASE,
-  timeout: 10000,
+  timeout: 15000,
 });
 
 api.interceptors.request.use(async (config) => {

@@ -22,21 +22,40 @@ export default function HistoryScreen() {
   const fetchHistory = async () => {
     try {
       const res = await api.get('/api/charging/sessions', { params: { limit: 20 } });
-      setSessions(res.data.data || []);
-    } catch {
+
+      const mappedSessions: Session[] = (res.data.data || []).map((item: any) => ({
+        sessionId: item.session_id,
+        chargeBoxId: item.charge_box_id,
+        startTime: item.start_time,
+        endTime: item.end_time,
+        energyKwh: Number(item.energy_kwh || 0),
+        totalCost: Number(item.total_cost || 0),
+        status: item.status || 'unknown',
+        stopReason: item.stop_reason || '—',
+      }));
+
+      setSessions(mappedSessions);
+    } catch (error) {
+      console.error('Failed to fetch history:', error);
+      setSessions([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  useEffect(() => { fetchHistory(); }, []);
+  useEffect(() => {
+    fetchHistory();
+  }, []);
 
   const formatDate = (iso: string) => {
     if (!iso) return '—';
     return new Date(iso).toLocaleDateString('en-IN', {
-      day: '2-digit', month: 'short', year: 'numeric',
-      hour: '2-digit', minute: '2-digit'
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
     });
   };
 
@@ -52,8 +71,17 @@ export default function HistoryScreen() {
     <View style={styles.container}>
       <FlatList
         data={sessions}
-        keyExtractor={(item) => item.sessionId.toString()}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchHistory(); }} tintColor="#22d3ee" />}
+        keyExtractor={(item, index) => item.sessionId?.toString() || index.toString()}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              fetchHistory();
+            }}
+            tintColor="#22d3ee"
+          />
+        }
         ListEmptyComponent={
           <View style={styles.center}>
             <Text style={styles.emptyText}>No charging history yet</Text>
@@ -63,24 +91,40 @@ export default function HistoryScreen() {
           <View style={styles.card}>
             <View style={styles.cardTop}>
               <Text style={styles.charger}>{item.chargeBoxId}</Text>
-              <View style={[styles.badge, { backgroundColor: item.status === 'completed' ? '#14532d' : '#7f1d1d' }]}>
-                <Text style={[styles.badgeText, { color: item.status === 'completed' ? '#22c55e' : '#fca5a5' }]}>
+              <View
+                style={[
+                  styles.badge,
+                  { backgroundColor: item.status === 'completed' ? '#14532d' : '#7f1d1d' },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.badgeText,
+                    { color: item.status === 'completed' ? '#22c55e' : '#fca5a5' },
+                  ]}
+                >
                   {item.status}
                 </Text>
               </View>
             </View>
+
             <Text style={styles.date}>{formatDate(item.startTime)}</Text>
+
             <View style={styles.stats}>
               <View style={styles.stat}>
                 <Text style={styles.statValue}>{(item.energyKwh || 0).toFixed(3)}</Text>
                 <Text style={styles.statLabel}>kWh</Text>
               </View>
+
               <View style={styles.divider} />
+
               <View style={styles.stat}>
                 <Text style={styles.statValue}>₹{(item.totalCost || 0).toFixed(2)}</Text>
                 <Text style={styles.statLabel}>Cost</Text>
               </View>
+
               <View style={styles.divider} />
+
               <View style={styles.stat}>
                 <Text style={styles.statValue}>{item.stopReason || '—'}</Text>
                 <Text style={styles.statLabel}>Reason</Text>
@@ -106,8 +150,8 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 11, fontWeight: '600' },
   date: { color: '#64748b', fontSize: 12, marginBottom: 12 },
   stats: { flexDirection: 'row', justifyContent: 'space-around' },
-  stat: { alignItems: 'center' },
-  statValue: { color: '#f1f5f9', fontSize: 16, fontWeight: '700' },
+  stat: { alignItems: 'center', flex: 1 },
+  statValue: { color: '#f1f5f9', fontSize: 16, fontWeight: '700', textAlign: 'center' },
   statLabel: { color: '#64748b', fontSize: 11, marginTop: 2 },
-  divider: { width: 1, backgroundColor: '#334155' },
+  divider: { width: 1, backgroundColor: '#334155', marginHorizontal: 8 },
 });
