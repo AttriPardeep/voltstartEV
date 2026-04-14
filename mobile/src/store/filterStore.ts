@@ -5,6 +5,7 @@ export interface ChargerFilters {
   availability: 'available' | 'all';
   minPower: number;
   maxDistance: number;
+  maxPrice: number;
 }
 
 interface FilterState {
@@ -19,6 +20,7 @@ const DEFAULT: ChargerFilters = {
   availability: 'all',
   minPower: 0,
   maxDistance: 999,
+  maxPrice: 999
 };
 
 export const useFilterStore = create<FilterState>((set) => ({

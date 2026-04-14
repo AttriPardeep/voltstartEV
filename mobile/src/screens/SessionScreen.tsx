@@ -11,7 +11,6 @@ import * as Haptics from 'expo-haptics';
 import { useSessionStore } from '../store/sessionStore';
 import { useAuthStore } from '../store/authStore';
 
-
 const SCREEN_W = Dimensions.get('window').width;
 
 // ─── Utilities ────────────────────────────────────────
@@ -76,6 +75,106 @@ const StatRow = React.memo(({ left, right, theme }: {
     )}
   </View>
 ));
+
+// ─── NEW: Charging Efficiency Card ─────────────────────
+function ChargingEfficiencyCard({ summary, user, theme }: { 
+  summary: SessionSummary; 
+  user: any;
+  theme: any;
+}) {
+  const batteryKwh = user?.batteryCapacityKwh;
+  const startSoc = summary.startSoc;
+  const endSoc = summary.endSoc;
+  const actualKwh = summary.energyKwh;
+
+  // Only show if we have enough data
+  if (!batteryKwh || startSoc == null || endSoc == null || actualKwh <= 0) 
+    return null;
+
+  // Calculate theoretical energy needed vs actual delivered
+  const theoreticalKwh = ((endSoc - startSoc) / 100) * batteryKwh;
+  const lossKwh = Math.max(0, actualKwh - theoreticalKwh);
+  const efficiencyPct = theoreticalKwh > 0 
+    ? Math.min(100, (theoreticalKwh / actualKwh) * 100) : 0;
+  const lossPercent = actualKwh > 0 
+    ? (lossKwh / actualKwh) * 100 : 0;
+
+  // Efficiency rating with color/icon
+  const rating = efficiencyPct >= 95 ? { label: 'Excellent', color: '#22c55e', icon: '🌟' }
+    : efficiencyPct >= 88 ? { label: 'Good', color: '#22d3ee', icon: '✅' }
+    : efficiencyPct >= 80 ? { label: 'Normal', color: '#f59e0b', icon: '⚡' }
+    : { label: 'High Loss', color: '#ef4444', icon: '⚠️' };
+
+  return (
+    <View style={[eff.card, { backgroundColor: theme.card, borderColor: theme.border, borderLeftColor: rating.color }]}>
+      <Text style={[eff.title, { color: theme.text }]}>🔬 Charging Efficiency</Text>
+      
+      {/* Main efficiency display */}
+      <View style={eff.effRow}>
+        <Text style={[eff.effPct, { color: rating.color }]}>
+          {efficiencyPct.toFixed(1)}%
+        </Text>
+        <View style={[eff.badge, { backgroundColor: rating.color + '22' }]}>
+          <Text style={{ color: rating.color, fontSize: 13, fontWeight: '700' }}>
+            {rating.icon} {rating.label}
+          </Text>
+        </View>
+      </View>
+
+      {/* Progress bar */}
+      <View style={[eff.progressBg, { backgroundColor: theme.border }]}>
+        <View style={[eff.progressFill, { 
+          width: `${Math.min(100, efficiencyPct)}%`,
+          backgroundColor: rating.color 
+        }]} />
+      </View>
+
+      {/* Energy breakdown grid */}
+      <View style={eff.breakdown}>
+        <View style={[eff.breakdownItem, { backgroundColor: theme.bgSecondary }]}>
+          <Text style={[eff.breakdownLabel, { color: theme.textMuted }]}>Energy to Battery</Text>
+          <Text style={[eff.breakdownValue, { color: '#22c55e' }]}>
+            {theoreticalKwh.toFixed(2)} kWh
+          </Text>
+        </View>
+        <View style={[eff.breakdownItem, { backgroundColor: theme.bgSecondary }]}>
+          <Text style={[eff.breakdownLabel, { color: theme.textMuted }]}>Lost to Heat</Text>
+          <Text style={[eff.breakdownValue, { color: '#ef4444' }]}>
+            {lossKwh.toFixed(2)} kWh
+          </Text>
+        </View>
+        <View style={[eff.breakdownItem, { backgroundColor: theme.bgSecondary }]}>
+          <Text style={[eff.breakdownLabel, { color: theme.textMuted }]}>Total Delivered</Text>
+          <Text style={[eff.breakdownValue, { color: '#22d3ee' }]}>
+            {actualKwh.toFixed(3)} kWh
+          </Text>
+        </View>
+        <View style={[eff.breakdownItem, { backgroundColor: theme.bgSecondary }]}>
+          <Text style={[eff.breakdownLabel, { color: theme.textMuted }]}>Heat Loss %</Text>
+          <Text style={[eff.breakdownValue, { color: '#f59e0b' }]}>
+            {lossPercent.toFixed(1)}%
+          </Text>
+        </View>
+      </View>
+
+      {/* Contextual insight */}
+      <View style={[eff.insight, { backgroundColor: theme.bgSecondary }]}>
+        <Text style={[eff.insightText, { color: theme.textSecondary }]}>
+          {lossKwh < 0.5
+            ? '✅ Minimal heat loss — battery and charger in great shape.'
+            : lossKwh < 2
+            ? `⚡ ${lossKwh.toFixed(1)} kWh lost to heat. Normal for DC fast charging.`
+            : `⚠️ ${lossKwh.toFixed(1)} kWh lost to heat. Consider slower AC charging for better efficiency.`}
+        </Text>
+        {summary.peakPowerKw > 100 && (
+          <Text style={[eff.insightText, { color: theme.textSecondary, marginTop: 4 }]}>
+            🌡️ High-power DC charging generates more heat — trade-off for speed.
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+}
 
 // ─── Main Screen ──────────────────────────────────────
 export default function SessionScreen() {
@@ -200,7 +299,7 @@ export default function SessionScreen() {
   }, [activeSession, telemetry, elapsed, currentSoc, peakPower, startSoc, stopSession]);
 
   if (summary) {
-    return <SummaryScreen summary={summary} onDismiss={() => setSummary(null)} theme={theme} />;
+    return <SummaryScreen summary={summary} onDismiss={() => setSummary(null)} theme={theme} user={user} />;
   }
 
   if (!activeSession) {
@@ -332,9 +431,9 @@ export default function SessionScreen() {
   );
 }
 
-// ─── Summary Screen ───────────────────────────────────
-function SummaryScreen({ summary, onDismiss, theme }:
-  { summary: SessionSummary; onDismiss: () => void; theme: any }) {
+// ─── Summary Screen (with Efficiency Card) ─────────────
+function SummaryScreen({ summary, onDismiss, theme, user }:
+  { summary: SessionSummary; onDismiss: () => void; theme: any; user: any }) {
   const costPerKwh = summary.energyKwh > 0 ? (summary.costTotal / summary.energyKwh).toFixed(2) : '—';
   const co2 = (summary.energyKwh * 0.82).toFixed(2);
   const km = (summary.energyKwh * 6).toFixed(0);
@@ -378,6 +477,9 @@ function SummaryScreen({ summary, onDismiss, theme }:
         )}
         <SummRow label="Duration" value={formatDuration(summary.duration)} theme={theme} />
       </View>
+
+      {/* ✅ NEW: Charging Efficiency Card */}
+      <ChargingEfficiencyCard summary={summary} user={user} theme={theme} />
 
       <View style={[styles.tipsCard, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
         <Text style={[styles.tipsTitle, { color: theme.accentBright }]}>💡 Smart Tips</Text>
@@ -478,4 +580,32 @@ const summ = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1 },
   rowLabel: { fontSize: 14 },
   rowValue: { fontSize: 14, fontWeight: '600' },
+});
+
+// ─── Efficiency Card Styles ───────────────────────────
+const eff = StyleSheet.create({
+  card: {
+    borderRadius: 14,
+    padding: 16, marginBottom: 14,
+    borderLeftWidth: 3,
+  },
+  title: { fontSize: 15, fontWeight: '700', marginBottom: 12 },
+  effRow: { flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', marginBottom: 8 },
+  effPct: { fontSize: 36, fontWeight: '800' },
+  badge: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
+  progressBg: { height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 16 },
+  progressFill: { height: '100%', borderRadius: 4 },
+  breakdown: { flexDirection: 'row', flexWrap: 'wrap',
+    gap: 8, marginBottom: 12 },
+  breakdownItem: {
+    flex: 1, minWidth: '45%',
+    borderRadius: 8, padding: 10,
+  },
+  breakdownLabel: { fontSize: 11,
+    marginBottom: 3, textTransform: 'uppercase' },
+  breakdownValue: { fontSize: 16, fontWeight: '800' },
+  insight: { borderRadius: 8, padding: 10 },
+  insightText: { fontSize: 12,
+    lineHeight: 18, marginBottom: 4 },
 });

@@ -196,17 +196,20 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     };
     
     ws.onclose = (event) => {
-      console.log(' WebSocket closed, code:', event.code, 'reason:', event.reason);
+      console.log('WebSocket closed, code:', event.code, 'reason:', event.reason);
       
-      if (event.code === 1000 || event.code === 4001 || isIntentionalClose) {
-        console.log(' Intentional close - not reconnecting');
+      // 1000 = normal close, 4001/4002 = auth failure (our custom codes)
+      // 1006 = abnormal/connection refused — should reconnect
+      if (event.code === 1000 || event.code === 4001 || event.code === 4002) {
+        console.log('Intentional close - not reconnecting');
         isIntentionalClose = false;
         return;
       }
       
-      console.log(' Unexpected close - scheduling reconnect in 5s...');
+      // For all other codes (1006, 1011, etc.) — reconnect
+      console.log('Unexpected close - reconnecting in 5s...');
       setTimeout(() => {
-        if (ws?.readyState !== WebSocket.OPEN && !isIntentionalClose) {
+        if (!isIntentionalClose && ws?.readyState !== WebSocket.OPEN) {
           get().connectWebSocket();
         }
       }, 5000);

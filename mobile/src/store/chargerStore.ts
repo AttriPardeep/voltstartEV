@@ -2,10 +2,21 @@
 import { create } from 'zustand';
 import * as Location from 'expo-location';
 import { api } from '../utils/api';
+import { cacheChargers, getCachedChargers, isOnline } from '../services/offlineCache';
 
 export interface Connector {
   connectorId: number;
   status: string;
+}
+
+export interface ChargerPricing {
+  model: string;
+  ratePerKwh: number | null;
+  ratePerMinute: number | null;
+  sessionFee: number;
+  displayName: string;
+  rateDisplay: string;
+  tiers: Array<{ max_kw: number; rate_per_kwh: number }> | null;
 }
 
 export interface Charger {
@@ -25,6 +36,7 @@ export interface Charger {
   connectors: Connector[];
   powerType?: string;
   maxPower?: number;
+  pricing?: ChargerPricing | null;
 }
 
 interface ChargerState {
@@ -32,36 +44,19 @@ interface ChargerState {
   userLocation: { latitude: number; longitude: number } | null;
   isLoading: boolean;
   locationPermission: boolean;
+  isOffline: boolean;
+  cacheAge: string | null;
   fetchChargers: () => Promise<void>;
   requestLocation: () => Promise<void>;
 }
 
-// Add this above the store in chargerStore.ts
-/* 
- * For TEST
- */
- 
-/*
-const CHARGER_COORDS: Record<string, { latitude: number; longitude: number; city: string; street: string }> = {
-  'CS-AC7K-00001':     { latitude: 19.068812, longitude: 72.833191, city: 'Mumbai',    street: 'Linking Road' },
-  'CS-AC7K-00002':     { latitude: 19.119677, longitude: 72.846421, city: 'Mumbai',    street: 'SV Road' },
-  'CS-AC22K-00001':    { latitude: 19.033048, longitude: 73.029662, city: 'Navi Mumbai',street: 'Palm Beach Road' },
-  'CS-AC22K-00002':    { latitude: 19.148202, longitude: 72.937573, city: 'Mumbai',    street: 'LBS Marg' },
-  'CS-DC50K-00001':    { latitude: 19.218331, longitude: 72.978089, city: 'Thane',     street: 'Eastern Express Highway' },
-  'CS-DC50K-00002':    { latitude: 18.520411, longitude: 73.856743, city: 'Pune',      street: 'JM Road' },
-  'CS-DC150K-00001':   { latitude: 18.559005, longitude: 73.786826, city: 'Pune',      street: 'Baner Road' },
-  'CS-DC150K-00002':   { latitude: 18.591212, longitude: 73.738909, city: 'Pune',      street: 'Hinjewadi Phase 1' },
-  'CS-CHAD50K-00001':  { latitude: 12.975526, longitude: 77.606790, city: 'Bengaluru', street: 'MG Road' },
-  'CS-AC11K3P-00001':  { latitude: 12.934533, longitude: 77.688416, city: 'Bengaluru', street: 'Outer Ring Road' },
-  'CS-HPC350K-00001':  { latitude: 17.412627, longitude: 78.439167, city: 'Hyderabad', street: 'Banjara Hills' },
-  'CS-SCHUKO3K-00001': { latitude: 17.440081, longitude: 78.348915, city: 'Hyderabad', street: 'Gachibowli' },
-};
-*/
 export const useChargerStore = create<ChargerState>((set, get) => ({
   chargers: [],
   userLocation: null,
   isLoading: false,
   locationPermission: false,
+  isOffline: false,
+  cacheAge: null,
 
   requestLocation: async () => {
     try {
@@ -92,35 +87,72 @@ export const useChargerStore = create<ChargerState>((set, get) => ({
   fetchChargers: async () => {
     set({ isLoading: true });
     try {
+      const online = await isOnline();
+
+      if (!online) {
+        const { cached, timestamp } = await getCachedChargers();
+        if (cached) {
+          const ageMin = timestamp 
+            ? Math.floor((Date.now() - timestamp) / 60000) : null;
+          const ageStr = ageMin != null
+            ? ageMin < 1 ? 'just now'
+            : ageMin < 60 ? `${ageMin}m ago`
+            : `${Math.floor(ageMin / 60)}h ago`
+            : 'unknown';
+          set({ chargers: cached, isLoading: false, 
+                isOffline: true, cacheAge: ageStr });
+        } else {
+          set({ isLoading: false, isOffline: true, cacheAge: null });
+        }
+        return;
+      }
+
       const { userLocation } = get();
-      const params = userLocation 
-        ? `?lat=${userLocation.latitude}&lng=${userLocation.longitude}` 
-        : '';
-      
+      const params = userLocation
+        ? `?lat=${userLocation.latitude}&lng=${userLocation.longitude}` : '';
       const res = await api.get(`/api/chargers${params}`);
-      console.log('API response count:', res.data.data?.length);
-      console.log('First charger:', JSON.stringify(res.data.data?.[0]));
-      
-      const chargers: Charger[] = (res.data.data || [])
-        .filter((c: any) => {
-          const hasCoords = c.latitude != null && c.longitude != null;
-          if (!hasCoords) console.log('Missing coords:', c.chargeBoxId);
-          return hasCoords;
-        })
-        .map((c: any) => ({
-          ...c,
-          latitude: Number(c.latitude),
-          longitude: Number(c.longitude),
-          connectors: Array.from({ length: c.totalConnectors || 1 }, (_, i) => ({
-            connectorId: i + 1,
-            status: i < (c.availableConnectors || 0) ? 'Available' : 'Charging',
-          })),
-        }));
-  
-      console.log('Chargers after filter:', chargers.length);
-      set({ chargers, isLoading: false });
-    } catch (err) {
-      console.warn('Failed to fetch chargers:', err);
+
+      //Use connectorStatuses from backend if available, otherwise guess
+      const chargers = (res.data.data || [])
+        .filter((c: any) => c.latitude != null && c.longitude != null)
+        .map((c: any) => {
+          // ── Per-connector status ──────────────────────
+          // Build connectors with correct individual status
+          const connectors: Connector[] = c.connectorStatuses?.length
+            ? c.connectorStatuses.map((cs: any) => ({
+                connectorId: cs.connectorId,
+                status: cs.status,
+              }))
+            : Array.from({ length: c.totalConnectors || 1 }, (_, i) => ({
+                connectorId: i + 1,
+                status: i < (c.availableConnectors || 0) ? 'Available' : 'Charging',
+              }));
+
+          return {
+            ...c,
+            latitude: Number(c.latitude),
+            longitude: Number(c.longitude),
+            connectors,
+            // ── Pricing ─────────────────────────────────
+            pricing: c.pricing ? {
+              model: c.pricing.model,
+              ratePerKwh: c.pricing.ratePerKwh,
+              ratePerMinute: c.pricing.ratePerMinute,
+              sessionFee: c.pricing.sessionFee,
+              displayName: c.pricing.displayName,
+              rateDisplay: c.pricing.rateDisplay,
+              tiers: c.pricing.tiers,
+            } : null,
+          };
+        });
+
+      await cacheChargers(chargers);
+      set({ chargers, isLoading: false, isOffline: false, cacheAge: null });
+    } catch {
+      const { cached, timestamp } = await getCachedChargers();
+      if (cached) {
+        set({ chargers: cached, isOffline: true });
+      }
       set({ isLoading: false });
     }
   },

@@ -10,6 +10,9 @@ import { useChargerStore, Charger } from '../store/chargerStore';
 import { useSessionStore } from '../store/sessionStore';
 import { useAuthStore } from '../store/authStore';
 import { useFilterStore } from '../store/filterStore';
+// AI assitance 
+import AssistantChat from '../components/AssistantChat';
+import { api } from '../utils/api';
 
 const STATUS_COLOR: Record<string, string> = {
   Available:   '#22c55e',
@@ -30,31 +33,78 @@ const POWER_OPTIONS = [
   { label: '150+ kW',value: 150 },
 ];
 
+// Price filter options
+const PRICE_OPTIONS = [
+  { label: 'Any',     value: 999 },
+  { label: '≤₹10',    value: 10 },
+  { label: '≤₹15',    value: 15 },
+  { label: '≤₹20',    value: 20 },
+  { label: '≤₹25',    value: 25 },
+];
+
 // ── Stable marker component ───────────────────────────
-/* TODO this is not allowing charger icon on map 
-const ChargerMarker = React.memo(({
-  charger, onPress
-}: { charger: Charger; onPress: (c: Charger) => void }) => {
-  const color = STATUS_COLOR[charger.status] || '#6b7280';
+
+const ChargerMarker = React.memo(({ charger, onPress }: { 
+  charger: Charger; 
+  onPress: (c: Charger) => void;
+}) => {
   const isAvailable = charger.status === 'Available';
+  
+  const bgColor = isAvailable ? '#10b981' : 
+                  charger.status === 'Busy' ? '#f59e0b' : 
+                  charger.status === 'Faulted' ? '#ef4444' : '#6b7280';
+
+  const connectorLabel = `${charger.availableConnectors}/${charger.totalConnectors}`;
+
   return (
     <Marker
+      key={charger.chargeBoxId}
       coordinate={{ latitude: charger.latitude, longitude: charger.longitude }}
       onPress={() => onPress(charger)}
-      tracksViewChanges={false}
     >
-      <View style={[mk.pin, { borderColor: color,
-        backgroundColor: isAvailable ? '#14532d' : '#1e293b' }]}>
-        <Text style={mk.icon}>⚡</Text>
-        <Text style={[mk.label, { color }]}>
-          {charger.availableConnectors}/{charger.totalConnectors}
-        </Text>
+      <View style={squareMarker.container}>
+        <View style={[squareMarker.badge, { backgroundColor: bgColor }]}>
+          <Text style={squareMarker.icon}>⚡</Text>
+          {/* Connector count below icon */}
+          <Text style={squareMarker.connectorCount}>{connectorLabel}</Text>
+        </View>
       </View>
     </Marker>
   );
 });
-*/
 
+const squareMarker = StyleSheet.create({
+  container: {
+    alignItems: 'center',
+  },
+  badge: {
+    width: 44,
+    height: 54,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+    paddingHorizontal: 6,
+  },
+  icon: {
+    fontSize: 18,  
+    color: '#fff',
+    marginBottom: 2,  
+  },
+  count: {
+    fontSize: 10,
+    color: '#fff',
+    fontWeight: '700',
+  },
+});
+
+/*
 const ChargerMarker = React.memo(({
   charger, onPress
 }: { charger: Charger; onPress: (c: Charger) => void }) => {
@@ -74,6 +124,180 @@ const ChargerMarker = React.memo(({
       description={`${charger.availableConnectors}/${charger.totalConnectors} available`}
     />
   );
+});
+*/
+
+// ✅ FIX 2: Updated PricingCard to show rate immediately without waiting for estimate
+function PricingCard({ charger, connectorId, user }: {
+  charger: Charger;
+  connectorId: number | null;
+  user: any;
+}) {
+  const [estimate, setEstimate] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Fetch estimate when connector selected
+  useEffect(() => {
+    if (!connectorId) {
+      setEstimate(null); // reset when deselected
+      return;
+    }
+    if (!charger.pricing) return;
+
+    setLoading(true);
+    const params = new URLSearchParams({
+      connectorId: connectorId.toString(),
+      maxPowerKw: charger.maxPower
+        ? (charger.maxPower / 1000).toString() : '22',
+    });
+
+    // Add vehicle params from user's primary vehicle
+    if (user?.batteryCapacityKwh) {
+      params.append('batteryKwh', user.batteryCapacityKwh.toString());
+    }
+    if (user?.targetSocPercent) {
+      params.append('targetSoc', user.targetSocPercent.toString());
+    }
+
+    api.get(`/api/chargers/${charger.chargeBoxId}/pricing-estimate?${params}`)
+      .then(res => setEstimate(res.data.data))
+      .catch(() => setEstimate(null))
+      .finally(() => setLoading(false));
+  }, [connectorId, charger.chargeBoxId]);
+
+  // Always show pricing section — even without estimate
+  // Show "No pricing info" only if truly no pricing
+  if (!charger.pricing) {
+    return (
+      <View style={pc.card}>
+        <Text style={pc.title}>💰 Pricing</Text>
+        <Text style={pc.noVehicle}>
+          Contact operator for pricing details
+        </Text>
+      </View>
+    );
+  }
+
+  const { pricing } = charger;
+
+  return (
+    <View style={pc.card}>
+      <View style={pc.header}>
+        <Text style={pc.title}>💰 Pricing</Text>
+        <Text style={pc.rateName}>{pricing.displayName}</Text>
+      </View>
+
+      {/* Always visible rate */}
+      <Text style={pc.rate}>{pricing.rateDisplay}</Text>
+
+      {/* Session fee callout */}
+      {pricing.sessionFee > 0 && (
+        <View style={pc.sessionFeeRow}>
+          <Text style={pc.sessionFeeText}>
+            + ₹{pricing.sessionFee.toFixed(0)} session fee applies
+          </Text>
+        </View>
+      )}
+
+      {/* Tiered pricing breakdown */}
+      {pricing.tiers && pricing.tiers.length > 0 && (
+        <View style={pc.tiers}>
+          <Text style={pc.tiersTitle}>Tiered by power:</Text>
+          {pricing.tiers.map((tier, i) => (
+            <View key={i} style={pc.tierRow}>
+              <Text style={pc.tierLabel}>Up to {tier.max_kw} kW</Text>
+              <Text style={pc.tierRate}>
+                ₹{tier.rate_per_kwh.toFixed(2)}/kWh
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Estimate section — only after connector selected */}
+      {!connectorId && (
+        <Text style={pc.selectHint}>
+          ↑ Select a connector above for cost estimate
+        </Text>
+      )}
+
+      {connectorId && loading && (
+        <View style={pc.estimateLoading}>
+          <ActivityIndicator size="small" color="#22d3ee" />
+          <Text style={pc.estimateLoadingText}>Calculating estimate...</Text>
+        </View>
+      )}
+
+      {connectorId && estimate && !loading && (
+        <View style={pc.estimate}>
+          <Text style={pc.estimateTitle}>📊 Cost Estimate</Text>
+          {estimate.estimatedCost != null ? (
+            <>
+              <View style={pc.estimateRow}>
+                <Text style={pc.estimateLabel}>Estimated Total</Text>
+                <Text style={[pc.estimateValue, { color: '#22d3ee' }]}>
+                  ₹{estimate.estimatedCost.toFixed(2)}
+                </Text>
+              </View>
+              {estimate.estimatedDuration && (
+                <View style={pc.estimateRow}>
+                  <Text style={pc.estimateLabel}>Estimated Time</Text>
+                  <Text style={pc.estimateValue}>
+                    ~{estimate.estimatedDuration} min
+                  </Text>
+                </View>
+              )}
+              <Text style={pc.breakdown}>{estimate.breakdown}</Text>
+            </>
+          ) : (
+            <Text style={pc.noVehicle}>
+              Add vehicle in Profile → My Vehicles for cost estimate
+            </Text>
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
+const pc = StyleSheet.create({
+  card: { backgroundColor: '#0f172a', borderRadius: 12,
+    padding: 14, marginBottom: 14,
+    borderWidth: 1, borderColor: '#1e3a5f' },
+  header: { flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', marginBottom: 6 },
+  title: { color: '#60a5fa', fontSize: 13, fontWeight: '700' },
+  rateName: { color: '#475569', fontSize: 12 },
+  rate: { color: '#22d3ee', fontSize: 18, fontWeight: '800',
+    marginBottom: 8 },
+  tiers: { gap: 4, marginBottom: 8 },
+  tierRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  tierLabel: { color: '#64748b', fontSize: 12 },
+  tierRate: { color: '#94a3b8', fontSize: 12, fontWeight: '600' },
+  estimate: { backgroundColor: '#1e293b', borderRadius: 8,
+    padding: 10, marginTop: 8 },
+  estimateTitle: { color: '#64748b', fontSize: 11,
+    fontWeight: '700', marginBottom: 8,
+    textTransform: 'uppercase', letterSpacing: 0.5 },
+  estimateRow: { flexDirection: 'row', justifyContent: 'space-between',
+    marginBottom: 4 },
+  estimateLabel: { color: '#64748b', fontSize: 13 },
+  estimateValue: { color: '#f1f5f9', fontSize: 13, fontWeight: '700' },
+  breakdown: { color: '#475569', fontSize: 11, marginTop: 6,
+    lineHeight: 16 },
+  noVehicle: { color: '#475569', fontSize: 12, fontStyle: 'italic' },
+  sessionFeeRow: {
+    backgroundColor: '#1c1a0e', borderRadius: 6,
+    paddingHorizontal: 10, paddingVertical: 5,
+    marginBottom: 8, alignSelf: 'flex-start',
+  },
+  sessionFeeText: { color: '#fbbf24', fontSize: 11, fontWeight: '600' },
+  tiersTitle: { color: '#64748b', fontSize: 11, marginBottom: 4 },
+  selectHint: { color: '#334155', fontSize: 11,
+    fontStyle: 'italic', marginTop: 6 },
+  estimateLoading: { flexDirection: 'row', alignItems: 'center',
+    gap: 8, marginTop: 8 },
+  estimateLoadingText: { color: '#475569', fontSize: 12 },
 });
 
 // ── Filter Bottom Sheet ───────────────────────────────
@@ -98,7 +322,7 @@ function FilterSheet({ visible, onClose }: {
       <Text style={fs.title}>Filter Chargers</Text>
 
       {/* Availability */}
-      <Text style={fs.label}>Availability</Text>
+      <Text style={fs.label}>AVAILABILITY</Text>
       <View style={fs.row}>
         {(['all', 'available'] as const).map(v => (
           <TouchableOpacity key={v}
@@ -113,7 +337,7 @@ function FilterSheet({ visible, onClose }: {
       </View>
 
       {/* Min Power */}
-      <Text style={fs.label}>Minimum Power</Text>
+      <Text style={fs.label}>MINIMUM POWER</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={fs.chipScroll}>
         {POWER_OPTIONS.map(opt => (
@@ -128,8 +352,26 @@ function FilterSheet({ visible, onClose }: {
         ))}
       </ScrollView>
 
-      {/* Distance */}
-      <Text style={fs.label}>Max Distance</Text>
+      {/* Maximum Price */}
+      <Text style={fs.label}>MAXIMUM PRICE</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+        style={fs.chipScroll}>
+        {PRICE_OPTIONS.map(opt => (
+          <TouchableOpacity key={opt.value}
+            style={[fs.chip, filters.maxPrice === opt.value && fs.chipActive]}
+            onPress={() => setFilters({ 
+              maxPrice: opt.value === 999 ? undefined : opt.value 
+            })}>
+            <Text style={[fs.chipText,
+              filters.maxPrice === opt.value && fs.chipTextActive]}>
+              {opt.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {/* Max Distance */}
+      <Text style={fs.label}>MAX DISTANCE</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={fs.chipScroll}>
         {[10, 25, 50, 100, 999].map(km => (
@@ -159,10 +401,10 @@ function FilterSheet({ visible, onClose }: {
 // ── Main Screen ───────────────────────────────────────
 export default function MapScreen() {
   const { chargers, fetchChargers, requestLocation,
-    userLocation, isLoading } = useChargerStore();
+    userLocation, isLoading, isOffline, cacheAge } = useChargerStore();
   const { startSession, fetchActiveSession, activeSession } = useSessionStore();
   const { user } = useAuthStore();
-  const { filters, showFilterSheet, toggleFilterSheet } = useFilterStore();
+  const { filters, setFilters, showFilterSheet, toggleFilterSheet } = useFilterStore();
 
   const [selected, setSelected] = useState<Charger | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -178,8 +420,24 @@ export default function MapScreen() {
     return () => clearInterval(interval);
   }, []);
 
+useEffect(() => {
+  if (chargers && chargers.length > 0) {
+    console.log('🔍 CHARGERS DATA RECEIVED:', chargers.map(c => ({
+      id: c.chargeBoxId,
+      maxPower: c.maxPower,
+      maxPowerKw: c.maxPower ? (c.maxPower / 1000).toFixed(1) + ' kW' : 'N/A',
+      name: c.name,
+      hasPricing: !!c.pricing,
+      pricingRate: c.pricing?.ratePerKwh,
+    })));
+  }
+}, [chargers]);
+
+  //  Guard the fitToCoordinates effect with optional chaining
+  //  fitToCoordinates effect centers on all chargers
+/*
   useEffect(() => {
-    if (filteredChargers.length === 0 || !mapRef.current) return;
+    if (!filteredChargers?.length || !mapRef.current) return;
     
     setTimeout(() => {
       mapRef.current?.fitToCoordinates(
@@ -193,16 +451,63 @@ export default function MapScreen() {
         }
       );
     }, 500);
-  }, [filteredChargers.length]);
+  }, [filteredChargers?.length]);
+*/  
+
+  useEffect(() => {
+    // Skip fitToCoordinates if we already centered on user location
+    if (userLocation?.latitude || !filteredChargers?.length || !mapRef.current) return;
+    
+    setTimeout(() => {
+      mapRef.current?.fitToCoordinates(
+        filteredChargers.map(c => ({
+          latitude: c.latitude,
+          longitude: c.longitude
+        })),
+        {
+          edgePadding: { top: 80, right: 40, bottom: 80, left: 40 },
+          animated: true,
+        }
+      );
+    }, 500);
+  }, [filteredChargers?.length, userLocation?.latitude]);
+
+  // MAP at centered at user location 
+  /*
+     { latitudeDelta: 0.01, longitudeDelta: 0.01 }  // ~1.1km - Very close
+     { latitudeDelta: 0.05, longitudeDelta: 0.05 }  // ~5.5km - Neighborhood
+     { latitudeDelta: 0.1,  longitudeDelta: 0.1  }  // ~11km  - City (RECOMMENDED)
+     { latitudeDelta: 0.5,  longitudeDelta: 0.5  }  // ~55km  - Metro area
+     { latitudeDelta: 2.0,  longitudeDelta: 2.0  }  // ~220km - Region
+   */
+  useEffect(() => {
+    if (userLocation?.latitude && userLocation?.longitude && mapRef.current) {
+      setTimeout(() => {
+        mapRef.current?.animateToRegion(
+          {
+            latitude: userLocation.latitude,
+            longitude: userLocation.longitude,
+            latitudeDelta: 0.1,   // Zoom level: ~11km view
+            longitudeDelta: 0.1,
+          },
+          1000
+        );
+      }, 800);
+    }
+  }, [userLocation?.latitude, userLocation?.longitude]);
  
- // Apply filters
-  const filteredChargers = chargers.filter(c => {
+  //  Guard filteredChargers computation - chargers might be undefined on first render
+  const filteredChargers = (chargers || []).filter(c => {
     if (filters.availability === 'available' && c.status !== 'Available')
       return false;
     if (filters.minPower > 0 && (c.maxPower || 0) / 1000 < filters.minPower)
       return false;
     if (filters.maxDistance < 999 && c.distance != null
       && c.distance > filters.maxDistance)
+      return false;
+
+    if (filters.maxPrice != null && c.pricing?.ratePerKwh != null
+      && c.pricing.ratePerKwh > filters.maxPrice)
       return false;
     return true;
   });
@@ -211,9 +516,25 @@ export default function MapScreen() {
     filters.availability !== 'all',
     filters.minPower > 0,
     filters.maxDistance < 999,
+    filters.maxPrice != null,  
   ].filter(Boolean).length;
 
   const handleMarkerPress = useCallback((charger: Charger) => {
+  console.log('📍 CHARGER SELECTED:', {
+    chargeBoxId: charger.chargeBoxId,
+    name: charger.name,
+    maxPower: charger.maxPower,
+    maxPowerKw: charger.maxPower ? (charger.maxPower / 1000).toFixed(1) + ' kW' : 'N/A',
+    status: charger.status,
+    connectors: charger.totalConnectors,
+    available: charger.availableConnectors,
+    pricing: charger.pricing ? {
+      ratePerKwh: charger.pricing.ratePerKwh,
+      displayName: charger.pricing.displayName,
+      rateDisplay: charger.pricing.rateDisplay,
+    } : 'NO PRICING',
+    rawCharger: charger, // Full object for inspection
+  });
     setSelected(charger);
     setSelectedConnector(null);
     setModalVisible(true);
@@ -250,20 +571,61 @@ export default function MapScreen() {
       Alert.alert('✅ Charging Started',
         `Session started on ${selected.chargeBoxId} Connector ${selectedConnector}`);
       fetchActiveSession();
-    } catch (err: any) {
-      const isTimeout = err?.code === 'ECONNABORTED'
-        || err?.message?.includes('timeout');
-      Alert.alert(
-        isTimeout ? '⏳ Taking longer than expected' : 'Failed',
-        isTimeout
-          ? 'Check the Session tab in 30 seconds — your session may have started.'
-          : err?.response?.data?.error || err?.message || 'Could not start session'
-      );
-    } finally {
+      } catch (err: any) {
+        const isTimeout = err?.code === 'ECONNABORTED' 
+          || err?.message?.includes('timeout')
+          || err?.message?.includes('Network Error');
+        
+        Alert.alert(
+          isTimeout ? '⏳ Connecting to Charger...' : 'Failed',
+          isTimeout
+            ? 'The charger is responding. Check the Session tab in 30 seconds — your charging session may have already started.'
+            : err?.response?.data?.error || err?.message || 'Could not start session',
+          isTimeout ? [
+            { text: 'Check Session Tab', onPress: () => {
+              setModalVisible(false);
+              // navigate to session tab if possible
+            }},
+            { text: 'OK' }
+          ] : [{ text: 'OK' }]
+        );
+      } finally {
       setStarting(false);
       startingRef.current = false;
     }
   };
+
+  // Add action handler inside MapScreen component
+  const handleAssistantAction = useCallback((action: any) => {
+    switch (action.type) {
+      case 'navigate': {
+        const charger = chargers.find(c => c.chargeBoxId === action.chargeBoxId);
+        if (charger) {
+          setSelected(charger);
+          setModalVisible(true);
+          // Fly map to charger
+          mapRef.current?.animateToRegion({
+            latitude: charger.latitude,
+            longitude: charger.longitude,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          }, 800);
+        }
+        break;
+      }
+      case 'filter':
+        if (action.availability) setFilters({ availability: action.availability });
+        if (action.minPower) setFilters({ minPower: action.minPower });
+        break;
+      case 'navigate_tab':
+        // Need navigation ref — pass from App.tsx or use a store
+        console.log('Navigate to tab:', action.tab);
+        break;
+      case 'stop_charging':
+        // Trigger stop flow
+        break;
+    }
+  }, [chargers, setFilters]);
 
   return (
     <View style={styles.container}>
@@ -297,10 +659,24 @@ export default function MapScreen() {
 
         <View style={styles.countBadge}>
           <Text style={styles.countTxt}>
-            {filteredChargers.length}/{chargers.length} chargers
+            {filteredChargers.length}/{chargers?.length || 0} chargers  {/* ✅ Guard chargers.length too */}
           </Text>
         </View>
       </View>
+
+      {/* Offline Banner - Updated with cache age */}
+      {isOffline && (
+        <View style={styles.offlineBanner}>
+          <Text style={styles.offlineTitle}>
+            📴 Offline Mode
+          </Text>
+          <Text style={styles.offlineText}>
+            {cacheAge
+              ? `Showing cached data from ${cacheAge} — availability may have changed`
+              : 'No cached data — connect to see chargers'}
+          </Text>
+        </View>
+      )}
 
       {/* Legend */}
       <View style={styles.legend}>
@@ -363,9 +739,9 @@ export default function MapScreen() {
                 )}
                 <Text style={styles.infoRow}>
                   ⚡ {selected.availableConnectors}/{selected.totalConnectors} available
-                  {selected.maxPower
-                    ? `  ·  ${(selected.maxPower / 1000).toFixed(0)} kW max`
-                    : ''}
+                   {selected.maxPower
+                     ? `  ·  ${(selected.maxPower / 1000).toFixed(0)} kW max`
+                     : ''}
                 </Text>
 
                 {/* Status + Navigate row */}
@@ -388,6 +764,13 @@ export default function MapScreen() {
                     <Text style={styles.navigateTxt}>🧭 Navigate</Text>
                   </TouchableOpacity>
                 </View>
+
+                {/* ✅ FIX 2: PricingCard between status and connector selection */}
+                <PricingCard
+                  charger={selected}
+                  connectorId={selectedConnector}
+                  user={user}
+                />
 
                 {/* Connector selection */}
                 <Text style={styles.sectionTitle}>SELECT CONNECTOR</Text>
@@ -446,6 +829,8 @@ export default function MapScreen() {
           </View>
         </View>
       </Modal>
+      {/* AI Assitance*/}
+      <AssistantChat onAction={handleAssistantAction} />
     </View>
   );
 }
@@ -459,6 +844,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center',
   },
+  
+  //  Offline Banner Styles - Updated
+  offlineBanner: {
+    position: 'absolute', top: 60, left: 16, right: 16,
+    backgroundColor: '#78350f', borderRadius: 10,
+    padding: 12, borderWidth: 1, borderColor: '#d97706',
+  },
+  offlineTitle: {
+    color: '#fcd34d', fontSize: 13, fontWeight: '700', marginBottom: 2
+  },
+  offlineText: { color: '#fde68a', fontSize: 12, lineHeight: 16 },
+  
   filterBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: '#1e293bee', borderRadius: 20,

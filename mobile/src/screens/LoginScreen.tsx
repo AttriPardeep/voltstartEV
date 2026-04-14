@@ -27,7 +27,7 @@ export default function LoginScreen() {
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.card}>
         <Text style={styles.logo}>⚡ voltstartEV</Text>
-        <Text style={styles.subtitle}>a EV network</Text>
+        <Text style={styles.subtitle}>an EV network</Text>
 
         <TextInput
           style={styles.input}
