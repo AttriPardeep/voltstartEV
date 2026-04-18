@@ -46,9 +46,40 @@ interface ChargerState {
   locationPermission: boolean;
   isOffline: boolean;
   cacheAge: string | null;
+  lastEtag: string | null;
+  // WebSocket update function
+  updateChargerStatus: (
+    chargeBoxId: string,
+    status: string,
+    connectorId?: number,
+    connectorStatus?: string
+  ) => void;
   fetchChargers: () => Promise<void>;
   requestLocation: () => Promise<void>;
 }
+
+const mergeChargers = (existing: Charger[], incoming: Charger[]): Charger[] => {
+  const existingMap = new Map(existing.map(c => [c.chargeBoxId, c]));
+  let hasChanges = false;
+
+  const merged = incoming.map(newCharger => {
+    const old = existingMap.get(newCharger.chargeBoxId);
+    if (!old) { hasChanges = true; return newCharger; }
+
+    const statusChanged    = old.status             !== newCharger.status;
+    const availableChanged = old.availableConnectors !== newCharger.availableConnectors;
+    const connChanged      = JSON.stringify(old.connectors) 
+                          !== JSON.stringify(newCharger.connectors);
+
+    if (statusChanged || availableChanged || connChanged) {
+      hasChanges = true;
+      return { ...old, ...newCharger };
+    }
+    return old;
+  });
+
+  return hasChanges ? merged : existing;
+};
 
 export const useChargerStore = create<ChargerState>((set, get) => ({
   chargers: [],
@@ -57,13 +88,49 @@ export const useChargerStore = create<ChargerState>((set, get) => ({
   locationPermission: false,
   isOffline: false,
   cacheAge: null,
+  lastEtag: null,
+
+  // Update single charger status from WebSocket
+  updateChargerStatus: (chargeBoxId, status, connectorId, connectorStatus) => {
+    set(state => {
+      const idx = state.chargers.findIndex(c => c.chargeBoxId === chargeBoxId);
+      if (idx === -1) return state; // charger not in list, no update
+
+      const existing = state.chargers[idx];
+
+      // Build updated connectors if connector-level update
+      let connectors = existing.connectors;
+      if (connectorId != null && connectorStatus != null) {
+        connectors = existing.connectors.map(c =>
+          c.connectorId === connectorId
+            ? { ...c, status: connectorStatus }
+            : c
+        );
+      }
+
+      const availableConnectors = connectors.filter(
+        c => c.status === 'Available'
+      ).length;
+
+      const updated: Charger = {
+        ...existing,
+        status,
+        connectors,
+        availableConnectors,
+      };
+
+      // Splice to avoid spreading entire array
+      const newChargers = [...state.chargers];
+      newChargers[idx] = updated;
+      return { chargers: newChargers };
+    });
+  },
 
   requestLocation: async () => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         set({ locationPermission: false });
-        // Still fetch without location
         get().fetchChargers();
         return;
       }
@@ -77,15 +144,16 @@ export const useChargerStore = create<ChargerState>((set, get) => ({
         },
         locationPermission: true
       });
-      get().fetchChargers(); // fetch with location coords
+      get().fetchChargers();
     } catch (err) {
       console.warn('Location error:', err);
-      get().fetchChargers(); // fetch anyway without location
+      get().fetchChargers();
     }
   },
 
   fetchChargers: async () => {
     set({ isLoading: true });
+    
     try {
       const online = await isOnline();
 
@@ -107,17 +175,29 @@ export const useChargerStore = create<ChargerState>((set, get) => ({
         return;
       }
 
-      const { userLocation } = get();
+      // ETag support: send If-None-Match header
+      const { lastEtag, userLocation } = get();
       const params = userLocation
         ? `?lat=${userLocation.latitude}&lng=${userLocation.longitude}` : '';
-      const res = await api.get(`/api/chargers${params}`);
+      
+      const headers: Record<string, string> = {};
+      if (lastEtag) headers['If-None-Match'] = lastEtag;
 
-      //Use connectorStatuses from backend if available, otherwise guess
+      const res = await api.get(`/api/chargers${params}`, { headers });
+
+      // 304 Not Modified: skip processing, keep existing data
+      if (res.status === 304) {
+        set({ isLoading: false });
+        return;
+      }
+
+      // Extract new ETag from response headers
+      const newEtag = res.headers['etag'] || res.headers['ETag'] || null;
+
+      // Use connectorStatuses from backend if available, otherwise guess
       const chargers = (res.data.data || [])
         .filter((c: any) => c.latitude != null && c.longitude != null)
         .map((c: any) => {
-          // ── Per-connector status ──────────────────────
-          // Build connectors with correct individual status
           const connectors: Connector[] = c.connectorStatuses?.length
             ? c.connectorStatuses.map((cs: any) => ({
                 connectorId: cs.connectorId,
@@ -133,7 +213,6 @@ export const useChargerStore = create<ChargerState>((set, get) => ({
             latitude: Number(c.latitude),
             longitude: Number(c.longitude),
             connectors,
-            // ── Pricing ─────────────────────────────────
             pricing: c.pricing ? {
               model: c.pricing.model,
               ratePerKwh: c.pricing.ratePerKwh,
@@ -147,8 +226,23 @@ export const useChargerStore = create<ChargerState>((set, get) => ({
         });
 
       await cacheChargers(chargers);
-      set({ chargers, isLoading: false, isOffline: false, cacheAge: null });
-    } catch {
+      // Update state with merged chargers AND new ETag
+      set(state => ({
+        chargers: mergeChargers(state.chargers, chargers),
+        isLoading: false,
+        isOffline: false,
+        cacheAge: null,
+        lastEtag: newEtag || state.lastEtag,  // Keep old ETag if new one missing
+      }));
+      
+    } catch (err: any) {
+      // Handle 304 from axios (might throw as error)
+      if (err?.response?.status === 304) {
+        set({ isLoading: false });
+        return;
+      }
+      
+      // Fallback to cache on error
       const { cached, timestamp } = await getCachedChargers();
       if (cached) {
         set({ chargers: cached, isOffline: true });

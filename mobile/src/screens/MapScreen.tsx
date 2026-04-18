@@ -17,6 +17,7 @@ const STATUS_COLOR: Record<string, string> = {
   Available:   '#22c55e',
   Busy:        '#f59e0b',
   Charging:    '#3b82f6',
+  Reserved:    '#f59e0b',
   Occupied:    '#f59e0b',
   Faulted:     '#ef4444',
   Unavailable: '#6b7280',
@@ -33,54 +34,81 @@ const POWER_OPTIONS = [
 ];
 
 const PRICE_OPTIONS = [
-  { label: 'Any',   value: 999 },
-  { label: '≤₹8',   value: 8   },
-  { label: '≤₹10',  value: 10  },
-  { label: '≤₹15',  value: 15  },
-  { label: '≤₹20',  value: 20  },
+  { label: 'Any',  value: 999 },
+  { label: '≤₹8',  value: 8   },
+  { label: '≤₹10', value: 10  },
+  { label: '≤₹15', value: 15  },
+  { label: '≤₹20', value: 20  },
 ];
 
-// ── Marker ────────────────────────────────────────────
-const ChargerMarker = React.memo(({ charger, onPress }: { 
-  charger: Charger; 
-  onPress: (c: Charger) => void;
-}) => {
-  const isAvailable = charger.status === 'Available';
-  
-  const bgColor = isAvailable        ? '#10b981' : 
-                  charger.status === 'Busy'    ? '#f59e0b' : 
-                  charger.status === 'Charging'? '#3b82f6' :
-                  charger.status === 'Faulted' ? '#ef4444' : '#6b7280';
+// ─────────────────────────────────────────────────────
+// Three changes:
+//   a) tracksViewChanges={!rendered} → true on first frame only,
+//      then locked false via onLayout. This is the correct Fabric
+//      (New Architecture) pattern for custom view markers.
+//   b) Added `isReserved` prop so the marker can show 🕐 badge.
+//   c) Custom memo comparator — only re-render when status,
+//      connector counts, or reservation state actually changes.
+// ─────────────────────────────────────────────────────
+const MARKER_W = 44;
+const MARKER_H = 48;
 
-  const connectorLabel = `${charger.availableConnectors ?? 0}/${charger.totalConnectors ?? 0}`;
+const ChargerMarker = React.memo(({ charger, onPress, isReserved }: {
+  charger: Charger;
+  onPress: (c: Charger) => void;
+  isReserved: boolean;
+}) => {
+  // tracksViewChanges fix: allow one render cycle to measure, then lock
+  const [rendered, setRendered] = useState(false);
+
+  const bgColor =
+    isReserved              ? '#7c3aed' :   // purple for reserved
+    charger.status === 'Available' ? '#10b981' :
+    charger.status === 'Busy'      ? '#f59e0b' :
+    charger.status === 'Charging'  ? '#3b82f6' :
+    charger.status === 'Faulted'   ? '#ef4444' : '#6b7280';
+
+  const connectorLabel =
+    `${charger.availableConnectors ?? 0}/${charger.totalConnectors ?? 0}`;
 
   return (
     <Marker
       coordinate={{ latitude: charger.latitude, longitude: charger.longitude }}
       onPress={() => onPress(charger)}
       anchor={{ x: 0.5, y: 1 }}
-      stopPropagation={true}
-      // tracksViewChanges={true} // Uncomment if still having issues
+      // true until first layout, then false — stops flicker AND
+      // ensures correct size on Fabric/New Architecture
+      tracksViewChanges={!rendered}
+      stopPropagation
     >
-      <View style={squareMarker.container}>
-        <View style={[squareMarker.badge, { backgroundColor: bgColor }]}>
-          <Text style={squareMarker.icon}>⚡</Text>
-          <Text style={squareMarker.connectorCount}>{connectorLabel}</Text>
+      {/* explicit px dimensions required on Fabric */}
+      <View
+        style={{ width: MARKER_W + 12, height: MARKER_H + 10, alignItems: 'center' }}
+        onLayout={() => setRendered(true)}
+      >
+        <View style={[sq.badge, { backgroundColor: bgColor }]}>
+          {/* Reservation icon overrides ⚡ when this connector is reserved */}
+          <Text style={sq.icon}>{isReserved ? '🕐' : '⚡'}</Text>
+          <Text style={sq.count}>{connectorLabel}</Text>
         </View>
-        {/* Triangle pointer */}
-        <View style={[squareMarker.pointer, { borderTopColor: bgColor }]} />
+        <View style={[sq.pointer, { borderTopColor: bgColor }]} />
       </View>
     </Marker>
   );
-});
+},
+// custom comparator — skip re-render if nothing visible changed
+(prev, next) =>
+  prev.charger.status              === next.charger.status &&
+  prev.charger.availableConnectors === next.charger.availableConnectors &&
+  prev.charger.totalConnectors     === next.charger.totalConnectors &&
+  prev.isReserved                  === next.isReserved
+);
 
-const squareMarker = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-  },
+// ── Marker styles ─────────────────────────────────────
+const sq = StyleSheet.create({
   badge: {
-    width: 44,
-    height: 48,  
+    width: MARKER_W,
+    height: MARKER_H,
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
@@ -91,18 +119,19 @@ const squareMarker = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 4,
     elevation: 6,
-    paddingHorizontal: 4,
   },
   icon: {
-    fontSize: 20,  
+    fontSize: 20,
     color: '#fff',
     marginBottom: 1,
+    includeFontPadding: false,
   },
-  connectorCount: {
-    fontSize: 11,  
+  count: {
+    fontSize: 11,
     color: '#fff',
     fontWeight: '800',
     letterSpacing: 0.3,
+    includeFontPadding: false,
   },
   pointer: {
     width: 0,
@@ -115,14 +144,15 @@ const squareMarker = StyleSheet.create({
     marginTop: -1,
   },
 });
+
 // ── PricingCard ───────────────────────────────────────
 function PricingCard({ charger, connectorId, user }: {
   charger: Charger;
   connectorId: number | null;
   user: any;
 }) {
-  const [estimate, setEstimate]   = useState<any>(null);
-  const [loading,  setLoading]    = useState(false);
+  const [estimate, setEstimate] = useState<any>(null);
+  const [loading,  setLoading]  = useState(false);
 
   useEffect(() => {
     if (!connectorId) { setEstimate(null); return; }
@@ -131,13 +161,13 @@ function PricingCard({ charger, connectorId, user }: {
     setLoading(true);
     const params = new URLSearchParams({
       connectorId: connectorId.toString(),
-      maxPowerKw:  charger.maxPower
+      maxPowerKw: charger.maxPower
         ? (charger.maxPower / 1000).toString() : '22',
     });
     if (user?.batteryCapacityKwh)
       params.append('batteryKwh', user.batteryCapacityKwh.toString());
     if (user?.targetSocPercent)
-      params.append('targetSoc',  user.targetSocPercent.toString());
+      params.append('targetSoc', user.targetSocPercent.toString());
 
     api.get(`/api/chargers/${charger.chargeBoxId}/pricing-estimate?${params}`)
       .then(r => setEstimate(r.data.data))
@@ -145,7 +175,6 @@ function PricingCard({ charger, connectorId, user }: {
       .finally(() => setLoading(false));
   }, [connectorId, charger.chargeBoxId]);
 
-  // Always render — show "contact operator" if no pricing
   if (!charger.pricing) {
     return (
       <View style={pc.card}>
@@ -164,10 +193,8 @@ function PricingCard({ charger, connectorId, user }: {
         <Text style={pc.rateName}>{pricing.displayName}</Text>
       </View>
 
-      {/* Rate — always visible */}
       <Text style={pc.rate}>{pricing.rateDisplay}</Text>
 
-      {/* Session fee */}
       {pricing.sessionFee > 0 && (
         <View style={pc.feeRow}>
           <Text style={pc.feeText}>
@@ -176,20 +203,20 @@ function PricingCard({ charger, connectorId, user }: {
         </View>
       )}
 
-      {/* Tiered breakdown */}
       {!!pricing.tiers?.length && (
         <View style={pc.tiers}>
           <Text style={pc.tiersTitle}>Tiered by power delivered:</Text>
-          {pricing.tiers.map((tier, i) => (
+          {pricing.tiers.map((tier: any, i: number) => (
             <View key={i} style={pc.tierRow}>
               <Text style={pc.tierLabel}>Up to {tier.max_kw} kW</Text>
-              <Text style={pc.tierRate}>₹{tier.rate_per_kwh.toFixed(2)}/kWh</Text>
+              <Text style={pc.tierRate}>
+                ₹{tier.rate_per_kwh.toFixed(2)}/kWh
+              </Text>
             </View>
           ))}
         </View>
       )}
 
-      {/* Estimate hint */}
       {!connectorId && (
         <Text style={pc.hint}>Select a connector above for cost estimate</Text>
       )}
@@ -297,7 +324,7 @@ function FilterSheet({ visible, onClose }: {
           </TouchableOpacity>
         ))}
       </ScrollView>
-      {/* Max Price */}
+
       <Text style={fs.label}>Max Price (per kWh)</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={fs.chipScroll}>
@@ -326,29 +353,36 @@ function FilterSheet({ visible, onClose }: {
 }
 
 // ── Main Screen ───────────────────────────────────────
-export default function MapScreen() {
+export default function MapScreen({ navigation }: any) {
   const {
     chargers, fetchChargers, requestLocation,
     userLocation, isLoading,
-    isOffline, cacheAge,           // ✅ from store
+    isOffline, cacheAge,
   } = useChargerStore();
+
   const { startSession, fetchActiveSession, activeSession } = useSessionStore();
   const { user } = useAuthStore();
   const { filters, setFilters, showFilterSheet, toggleFilterSheet } = useFilterStore();
 
-  const [selected, setSelected]           = useState<Charger | null>(null);
-  const [modalVisible, setModalVisible]   = useState(false);
-  const [selectedConnector, setSelectedConnector] = useState<number | null>(null);
-  const [starting, setStarting]           = useState(false);
+  const [selected, setSelected]                     = useState<Charger | null>(null);
+  const [modalVisible, setModalVisible]             = useState(false);
+  const [selectedConnector, setSelectedConnector]   = useState<number | null>(null);
+  const [starting, setStarting]                     = useState(false);
+  const [reserving, setReserving]                   = useState(false);
+  const [activeReservation, setActiveReservation]   = useState<any>(null);
+
   const startingRef = useRef(false);
   const mapRef      = useRef<MapView>(null);
 
-  //  compute filteredChargers BEFORE any useEffect that uses it
+  // derive isReserved from activeReservation for marker
+  // This lets ChargerMarker show 🕐 without needing a separate API call
+  const reservedChargeBoxId = activeReservation?.chargeBoxId ?? null;
+
+  // filteredChargers computed before any useEffect that references it
   const filteredChargers = useMemo(() =>
     (chargers || []).filter(c => {
       if (filters.availability === 'available' && c.status !== 'Available')
         return false;
-      //  maxPower is in Watts — divide by 1000 to get kW
       if (filters.minPower > 0 && (c.maxPower || 0) / 1000 < filters.minPower)
         return false;
       if (filters.maxDistance < 999 && c.distance != null
@@ -356,7 +390,7 @@ export default function MapScreen() {
         return false;
       if (filters.maxPrice < 999 && c.pricing?.ratePerKwh != null
         && c.pricing.ratePerKwh > filters.maxPrice)
-        return false;		
+        return false;
       return true;
     }),
   [chargers, filters]);
@@ -365,19 +399,40 @@ export default function MapScreen() {
     filters.availability !== 'all',
     filters.minPower > 0,
     filters.maxDistance < 999,
-	filters.maxPrice < 999, 
+    filters.maxPrice < 999,
   ].filter(Boolean).length;
 
-  // Initial load
+  // Initial load + polling
   useEffect(() => {
     requestLocation();
     fetchActiveSession();
-    fetchChargers(); // immediate fetch
-    const interval = setInterval(fetchChargers, 30000);
+    fetchChargers();
+
+    // 2 min polling instead of 30s — WebSocket handles real-time updates
+    const interval = setInterval(fetchChargers, 2 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // Center on user location when it arrives
+  // Load active reservation once on mount
+  useEffect(() => {
+    api.get('/api/reservations/active')
+      .then(r => {
+        if (r.data.success && r.data.data) {
+          setActiveReservation(r.data.data);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Refresh reservation when modal opens for a new charger
+  useEffect(() => {
+    if (!modalVisible) return;
+    api.get('/api/reservations/active')
+      .then(r => setActiveReservation(r.data.success ? r.data.data : null))
+      .catch(() => setActiveReservation(null));
+  }, [modalVisible, selected?.chargeBoxId]);
+
+  // Center on user location
   useEffect(() => {
     if (!userLocation?.latitude || !mapRef.current) return;
     setTimeout(() => {
@@ -392,7 +447,7 @@ export default function MapScreen() {
 
   // Fit to chargers only if no user location
   useEffect(() => {
-    if (userLocation?.latitude) return; // user location takes priority
+    if (userLocation?.latitude) return;
     if (!filteredChargers.length || !mapRef.current) return;
     setTimeout(() => {
       mapRef.current?.fitToCoordinates(
@@ -441,6 +496,10 @@ export default function MapScreen() {
       await startSession(selected.chargeBoxId, selectedConnector, idTag);
       setModalVisible(false);
       setSelectedConnector(null);
+      // Clear reservation if session started on reserved connector
+      if (activeReservation?.chargeBoxId === selected.chargeBoxId) {
+        setActiveReservation(null);
+      }
       Alert.alert('✅ Charging Started',
         `Session started on ${selected.chargeBoxId} Connector ${selectedConnector}`);
       fetchActiveSession();
@@ -454,8 +513,7 @@ export default function MapScreen() {
           ? 'The charger is responding. Check the Session tab in 30 seconds.'
           : err?.response?.data?.error || err?.message || 'Could not start session',
         isTimeout
-          ? [{ text: 'Check Session Tab',
-               onPress: () => setModalVisible(false) },
+          ? [{ text: 'Check Session Tab', onPress: () => setModalVisible(false) },
              { text: 'OK' }]
           : [{ text: 'OK' }]
       );
@@ -463,6 +521,75 @@ export default function MapScreen() {
       setStarting(false);
       startingRef.current = false;
     }
+  };
+
+  const handleReserve = async () => {
+    if (!selected || !selectedConnector) return;
+    setReserving(true);
+    try {
+      const res = await api.post('/api/reservations', {
+        chargeBoxId: selected.chargeBoxId,
+        connectorId: selectedConnector,
+      });
+      const newReservation = res.data.data;
+      setActiveReservation(newReservation);
+
+      // Fetch fresh chargers THEN use store's updated array
+      // use store getter after fetch to avoid stale closure
+      await fetchChargers();
+      const freshChargers = useChargerStore.getState().chargers;
+      const updatedCharger = freshChargers.find(
+        c => c.chargeBoxId === selected.chargeBoxId
+      );
+      if (updatedCharger) setSelected(updatedCharger);
+
+      setModalVisible(false);
+      Alert.alert(
+        '🕐 Reserved!',
+        `Connector #${selectedConnector} on ${selected.chargeBoxId} is held for 30 minutes.`
+      );
+    } catch (err: any) {
+      Alert.alert('Failed', err?.response?.data?.error || 'Could not reserve');
+    } finally {
+      setReserving(false);
+    }
+  };
+
+  const handleCancelReservation = async () => {
+    if (!activeReservation) return;
+
+    Alert.alert(
+      'Cancel Reservation',
+      'Are you sure you want to cancel this reservation?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.delete(`/api/reservations/${activeReservation.id}`);
+
+              // Clear reservation state FIRST
+              setActiveReservation(null);
+
+              // use store getter after fetch — not stale closure `chargers`
+              await fetchChargers();
+              const freshChargers = useChargerStore.getState().chargers;
+              const updatedCharger = freshChargers.find(
+                c => c.chargeBoxId === selected?.chargeBoxId
+              );
+              if (updatedCharger) setSelected(updatedCharger);
+
+              Alert.alert('Cancelled', 'Your reservation has been cancelled.');
+            } catch (err: any) {
+              Alert.alert('Failed',
+                err?.response?.data?.error || 'Could not cancel reservation');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleAssistantAction = useCallback((action: any) => {
@@ -502,8 +629,13 @@ export default function MapScreen() {
         showsMyLocationButton
       >
         {filteredChargers.map(charger => (
-          <ChargerMarker key={charger.chargeBoxId}
-            charger={charger} onPress={handleMarkerPress} />
+          // pass isReserved so marker shows 🕐 icon
+          <ChargerMarker
+            key={charger.chargeBoxId}
+            charger={charger}
+            onPress={handleMarkerPress}
+            isReserved={reservedChargeBoxId === charger.chargeBoxId}
+          />
         ))}
       </MapView>
 
@@ -525,7 +657,7 @@ export default function MapScreen() {
         </View>
       </View>
 
-      {/*  offline banner — only show when truly offline */}
+      {/* Offline banner */}
       {isOffline === true && (
         <View style={s.offlineBanner}>
           <Text style={s.offlineTitle}>📴 Offline Mode</Text>
@@ -537,10 +669,29 @@ export default function MapScreen() {
         </View>
       )}
 
+      {/* Active reservation global banner (visible outside modal) */}
+      {activeReservation && !modalVisible && (
+        <View style={s.globalReservationBanner}>
+          <Text style={s.globalReservationText}>
+            🕐 Reservation active — {Math.max(0, Math.floor(
+              (new Date(activeReservation.expiresAt).getTime() - Date.now()) / 60000
+            ))} min left on {activeReservation.chargeBoxId}
+          </Text>
+          <TouchableOpacity onPress={handleCancelReservation}>
+            <Text style={s.globalReservationCancel}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Legend */}
       <View style={s.legend}>
-        {[['Available','#22c55e'],['Busy','#f59e0b'],
-          ['Faulted','#ef4444'],['Offline','#6b7280']].map(([label, color]) => (
+        {[
+          ['Available', '#22c55e'],
+          ['Busy',      '#f59e0b'],
+          ['Faulted',   '#ef4444'],
+          ['Reserved',  '#7c3aed'],
+          ['Offline',   '#6b7280'],
+        ].map(([label, color]) => (
           <View key={label} style={s.legendItem}>
             <View style={[s.legendDot, { backgroundColor: color }]} />
             <Text style={s.legendText}>{label}</Text>
@@ -554,7 +705,7 @@ export default function MapScreen() {
         </View>
       )}
 
-      {/* Filter sheet backdrop + sheet */}
+      {/* Filter sheet */}
       {showFilterSheet && (
         <TouchableOpacity style={s.overlay}
           onPress={toggleFilterSheet} activeOpacity={1}>
@@ -627,51 +778,108 @@ export default function MapScreen() {
                   user={user}
                 />
 
+                {/* Active reservation banner (in-modal) */}
+                {activeReservation?.chargeBoxId === selected?.chargeBoxId && (
+                  <View style={s.reservationBanner}>
+                    <View>
+                      <Text style={s.reservationBannerText}>
+                        🕐 Your reservation is active
+                      </Text>
+                      <Text style={[s.reservationBannerText,
+                        { fontSize: 11, opacity: 0.8 }]}>
+                        Connector #{activeReservation.connectorId} · expires in{' '}
+                        {Math.max(0, Math.floor(
+                          (new Date(activeReservation.expiresAt).getTime() - Date.now())
+                          / 60000
+                        ))} min
+                      </Text>
+                    </View>
+                    <TouchableOpacity onPress={handleCancelReservation}>
+                      <Text style={s.reservationCancelText}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
                 {/* Connectors */}
                 <Text style={s.sectionTitle}>SELECT CONNECTOR</Text>
                 <View style={s.connectorGrid}>
                   {(selected.connectors || []).map(conn => {
-                    const available = conn.status === 'Available';
-                    const isSel    = selectedConnector === conn.connectorId;
-                    const clr      = STATUS_COLOR[conn.status] || '#6b7280';
+                    const available   = conn.status === 'Available';
+                    const isReserved  = conn.status === 'Reserved';
+                    // also highlight if THIS connector is the one we reserved
+                    const isMyRes     =
+                      activeReservation?.chargeBoxId === selected.chargeBoxId &&
+                      activeReservation?.connectorId === conn.connectorId;
+                    const isSel       = selectedConnector === conn.connectorId;
+                    const clr         = isMyRes
+                      ? '#7c3aed'
+                      : STATUS_COLOR[conn.status] || '#6b7280';
+
                     return (
                       <TouchableOpacity
                         key={conn.connectorId}
-                        style={[s.connCard,
+                        style={[
+                          s.connCard,
                           { borderColor: isSel ? '#22d3ee' : clr },
-                          isSel && s.connCardSel,
-                          !available && s.connCardDim,
+                          isSel     && s.connCardSel,
+                          isMyRes   && s.connCardMyReserved,
+                          isReserved && !isMyRes && s.connCardReserved,
+                          (!available && !isReserved && !isMyRes)
+                            && s.connCardDim,
                         ]}
                         onPress={() =>
-                          available && setSelectedConnector(conn.connectorId)}
-                        disabled={!available}>
-                        <Text style={s.connIcon}>🔌</Text>
+                          (available || isMyRes) &&
+                          setSelectedConnector(conn.connectorId)
+                        }
+                        disabled={!available && !isMyRes}
+                      >
+                        <Text style={s.connIcon}>
+                          {isMyRes ? '🕐' : '🔌'}
+                        </Text>
                         <Text style={s.connId}>#{conn.connectorId}</Text>
                         <View style={[s.connDot, { backgroundColor: clr }]} />
                         <Text style={[s.connStatus, { color: clr }]}>
-                          {conn.status}
+                          {isMyRes ? 'Your Reservation' : conn.status}
                         </Text>
-                        {isSel && <Text style={s.connTick}>✓</Text>}
+                        {isMyRes && (
+                          <Text style={s.connReservedBadge}>Tap to start</Text>
+                        )}
+                        {isSel && !isMyRes && (
+                          <Text style={s.connTick}>✓</Text>
+                        )}
                       </TouchableOpacity>
                     );
                   })}
                 </View>
 
-                {/* Start button */}
-                {selected.status === 'Available' && (
-                  <TouchableOpacity
-                    style={[s.startBtn,
-                      (!selectedConnector || starting) && s.startBtnDim]}
-                    onPress={handleStartCharging}
-                    disabled={!selectedConnector || starting}>
-                    {starting
-                      ? <ActivityIndicator color="#0f172a" />
-                      : <Text style={s.startBtnTxt}>
-                          {selectedConnector
-                            ? `⚡ Start on Connector ${selectedConnector}`
-                            : '← Select a connector above'}
-                        </Text>}
-                  </TouchableOpacity>
+                {/* Start / Reserve buttons */}
+                {selected.status === 'Available' && selectedConnector && (
+                  <View style={{ gap: 10, marginTop: 10 }}>
+                    <TouchableOpacity
+                      style={[s.startBtn, starting && s.startBtnDim]}
+                      onPress={handleStartCharging}
+                      disabled={!selectedConnector || starting}>
+                      {starting
+                        ? <ActivityIndicator color="#0f172a" />
+                        : <Text style={s.startBtnTxt}>
+                            ⚡ Start on Connector {selectedConnector}
+                          </Text>}
+                    </TouchableOpacity>
+
+                    {/* Only show Reserve if no active reservation on this charger */}
+                    {!activeReservation && (
+                      <TouchableOpacity
+                        style={s.reserveBtn}
+                        onPress={handleReserve}
+                        disabled={reserving}>
+                        {reserving
+                          ? <ActivityIndicator color="#22d3ee" />
+                          : <Text style={s.reserveBtnTxt}>
+                              🕐 Reserve for 30 min
+                            </Text>}
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 )}
               </ScrollView>
             )}
@@ -687,7 +895,7 @@ export default function MapScreen() {
 // ── Styles ────────────────────────────────────────────
 const s = StyleSheet.create({
   container: { flex: 1 },
-  map: { flex: 1 },
+  map:       { flex: 1 },
   topBar: {
     position: 'absolute', top: 16, left: 16, right: 16,
     flexDirection: 'row', justifyContent: 'space-between',
@@ -701,7 +909,7 @@ const s = StyleSheet.create({
   },
   filterBtnActive: { borderColor: '#22d3ee', backgroundColor: '#0c4a6eee' },
   filterIcon: { fontSize: 14 },
-  filterTxt: { color: '#94a3b8', fontSize: 13, fontWeight: '600' },
+  filterTxt:       { color: '#94a3b8', fontSize: 13, fontWeight: '600' },
   filterTxtActive: { color: '#22d3ee' },
   countBadge: {
     backgroundColor: '#1e293bee', borderRadius: 20,
@@ -717,13 +925,29 @@ const s = StyleSheet.create({
     color: '#fcd34d', fontSize: 13, fontWeight: '700', marginBottom: 2,
   },
   offlineText: { color: '#fde68a', fontSize: 12, lineHeight: 16 },
+
+  // global reservation banner visible on map when modal is closed
+  globalReservationBanner: {
+    position: 'absolute', top: 60, left: 16, right: 16,
+    backgroundColor: '#3b0764', borderRadius: 10,
+    padding: 12, borderWidth: 1, borderColor: '#7c3aed',
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  globalReservationText: {
+    color: '#c4b5fd', fontSize: 12, fontWeight: '600', flex: 1,
+  },
+  globalReservationCancel: {
+    color: '#f87171', fontSize: 12, fontWeight: '700', marginLeft: 8,
+  },
+
   legend: {
     position: 'absolute', bottom: 16, left: 16,
     backgroundColor: '#1e293bcc', borderRadius: 10,
     padding: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 8,
   },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendDot:  { width: 8, height: 8, borderRadius: 4 },
   legendText: { color: '#cbd5e1', fontSize: 10 },
   loadingBadge: {
     position: 'absolute', top: 60, right: 16,
@@ -734,25 +958,31 @@ const s = StyleSheet.create({
     backgroundColor: '#00000066',
     justifyContent: 'flex-end',
   },
-  modalOverlay: { flex: 1, backgroundColor: '#00000088',
-    justifyContent: 'flex-end' },
+  modalOverlay: {
+    flex: 1, backgroundColor: '#00000088', justifyContent: 'flex-end',
+  },
   modalCard: {
     backgroundColor: '#1e293b', borderTopLeftRadius: 24,
     borderTopRightRadius: 24, padding: 24, paddingBottom: 40,
     maxHeight: '85%',
   },
-  modalHeader: { flexDirection: 'row', alignItems: 'flex-start',
-    marginBottom: 8 },
+  modalHeader: {
+    flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8,
+  },
   modalTitle: { color: '#22d3ee', fontSize: 16, fontWeight: '800' },
-  modalName: { color: '#94a3b8', fontSize: 12, marginTop: 2 },
-  closeBtn: { padding: 4, marginLeft: 8 },
-  closeTxt: { color: '#64748b', fontSize: 20 },
-  infoRow: { color: '#94a3b8', fontSize: 13, marginBottom: 4 },
-  actionRow: { flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', marginVertical: 10 },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 6,
-    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
-  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  modalName:  { color: '#94a3b8', fontSize: 12, marginTop: 2 },
+  closeBtn:   { padding: 4, marginLeft: 8 },
+  closeTxt:   { color: '#64748b', fontSize: 20 },
+  infoRow:    { color: '#94a3b8', fontSize: 13, marginBottom: 4 },
+  actionRow: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', marginVertical: 10,
+  },
+  statusBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
+  },
+  statusDot:  { width: 8, height: 8, borderRadius: 4 },
   statusText: { fontWeight: '700', fontSize: 13 },
   navigateBtn: {
     backgroundColor: '#0c4a6e', borderRadius: 10,
@@ -764,47 +994,58 @@ const s = StyleSheet.create({
     color: '#475569', fontSize: 11, fontWeight: '700',
     letterSpacing: 1, marginTop: 16, marginBottom: 10,
   },
-  connectorGrid: { flexDirection: 'row', flexWrap: 'wrap',
-    gap: 10, marginBottom: 20 },
+  connectorGrid: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20,
+  },
   connCard: {
     borderWidth: 2, borderRadius: 12, padding: 12,
     alignItems: 'center', minWidth: 80, backgroundColor: '#0f172a',
   },
-  connCardSel: { backgroundColor: '#0c4a6e' },
-  connCardDim: { opacity: 0.4 },
-  connIcon: { fontSize: 20, marginBottom: 4 },
-  connId: { color: '#f1f5f9', fontSize: 14, fontWeight: '700' },
-  connDot: { width: 6, height: 6, borderRadius: 3, marginTop: 4 },
+  connCardSel:        { backgroundColor: '#0c4a6e' },
+  connCardDim:        { opacity: 0.4 },
+  // my reservation: purple highlight
+  connCardMyReserved: {
+    backgroundColor: '#2e1065',
+    borderColor: '#7c3aed',
+    borderWidth: 2,
+  },
+  // Someone else's reservation: amber
+  connCardReserved: {
+    backgroundColor: '#1c1a0e',
+    borderColor: '#f59e0b',
+    borderWidth: 2,
+  },
+  connIcon:   { fontSize: 20, marginBottom: 4 },
+  connId:     { color: '#f1f5f9', fontSize: 14, fontWeight: '700' },
+  connDot:    { width: 6, height: 6, borderRadius: 3, marginTop: 4 },
   connStatus: { fontSize: 10, marginTop: 2 },
-  connTick: { color: '#22d3ee', fontSize: 16, fontWeight: '800',
-    marginTop: 4 },
+  connReservedBadge: {
+    color: '#c4b5fd', fontSize: 9, fontWeight: '700', marginTop: 2,
+  },
+  connTick: {
+    color: '#22d3ee', fontSize: 16, fontWeight: '800', marginTop: 4,
+  },
   startBtn: {
     backgroundColor: '#22d3ee', borderRadius: 14,
     padding: 16, alignItems: 'center', marginTop: 4,
   },
   startBtnDim: { backgroundColor: '#334155' },
   startBtnTxt: { color: '#0f172a', fontWeight: '800', fontSize: 15 },
-});
-
-// ── Marker styles ─────────────────────────────────────
-const mk = StyleSheet.create({
-  container: { alignItems: 'center' },
-  badge: {
-    minWidth: 40, paddingHorizontal: 6, paddingVertical: 4,
-    borderRadius: 8, alignItems: 'center',
-    borderWidth: 2, borderColor: '#fff',
-    shadowColor: '#000', shadowOpacity: 0.3,
-    shadowRadius: 3, elevation: 5,
+  reserveBtn: {
+    borderRadius: 14, padding: 14, alignItems: 'center',
+    borderWidth: 2, borderColor: '#22d3ee', backgroundColor: 'transparent',
   },
-  icon:    { fontSize: 14, color: '#fff' },
-  //  style is named 'count', referenced correctly
-  count:   { fontSize: 9,  color: '#fff', fontWeight: '700' },
-  rate:    { fontSize: 8,  color: '#fde68a', fontWeight: '700' },
-  pointer: {
-    width: 0, height: 0,
-    borderLeftWidth: 5, borderRightWidth: 5, borderTopWidth: 6,
-    borderLeftColor: 'transparent', borderRightColor: 'transparent',
+  reserveBtnTxt: { color: '#22d3ee', fontWeight: '700', fontSize: 15 },
+  reservationBanner: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', backgroundColor: '#2e1065',
+    borderRadius: 10, padding: 12, marginBottom: 12,
+    borderWidth: 1, borderColor: '#7c3aed',
   },
+  reservationBannerText: {
+    color: '#c4b5fd', fontSize: 13, fontWeight: '600',
+  },
+  reservationCancelText: { color: '#f87171', fontSize: 13, fontWeight: '600' },
 });
 
 // ── PricingCard styles ────────────────────────────────
@@ -814,38 +1055,45 @@ const pc = StyleSheet.create({
     padding: 14, marginBottom: 14,
     borderWidth: 1, borderColor: '#1e3a5f',
   },
-  header: { flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 6 },
+  header: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', marginBottom: 6,
+  },
   title:    { color: '#60a5fa', fontSize: 13, fontWeight: '700' },
   rateName: { color: '#475569', fontSize: 12 },
-  rate:     { color: '#22d3ee', fontSize: 20, fontWeight: '800',
-    marginBottom: 6 },
+  rate:     { color: '#22d3ee', fontSize: 20, fontWeight: '800', marginBottom: 6 },
   feeRow: {
     backgroundColor: '#1c1a0e', borderRadius: 6,
     paddingHorizontal: 10, paddingVertical: 4,
     alignSelf: 'flex-start', marginBottom: 8,
   },
-  feeText:   { color: '#fbbf24', fontSize: 11, fontWeight: '600' },
-  tiers:     { gap: 3, marginBottom: 8 },
-  tiersTitle:{ color: '#475569', fontSize: 10, marginBottom: 4 },
-  tierRow:   { flexDirection: 'row', justifyContent: 'space-between' },
-  tierLabel: { color: '#64748b', fontSize: 12 },
-  tierRate:  { color: '#94a3b8', fontSize: 12, fontWeight: '600' },
-  hint:      { color: '#334155', fontSize: 11, fontStyle: 'italic',
-    marginTop: 6 },
-  estimateLoading: { flexDirection: 'row', alignItems: 'center',
-    gap: 8, marginTop: 8 },
+  feeText:    { color: '#fbbf24', fontSize: 11, fontWeight: '600' },
+  tiers:      { gap: 3, marginBottom: 8 },
+  tiersTitle: { color: '#475569', fontSize: 10, marginBottom: 4 },
+  tierRow:    { flexDirection: 'row', justifyContent: 'space-between' },
+  tierLabel:  { color: '#64748b', fontSize: 12 },
+  tierRate:   { color: '#94a3b8', fontSize: 12, fontWeight: '600' },
+  hint: {
+    color: '#334155', fontSize: 11, fontStyle: 'italic', marginTop: 6,
+  },
+  estimateLoading: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8,
+  },
   estimateLoadingText: { color: '#475569', fontSize: 12 },
-  estimate:  { backgroundColor: '#1e293b', borderRadius: 8,
-    padding: 10, marginTop: 8 },
-  estimateTitle: { color: '#64748b', fontSize: 11, fontWeight: '700',
-    marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
-  estimateRow: { flexDirection: 'row', justifyContent: 'space-between',
-    marginBottom: 4 },
+  estimate: {
+    backgroundColor: '#1e293b', borderRadius: 8, padding: 10, marginTop: 8,
+  },
+  estimateTitle: {
+    color: '#64748b', fontSize: 11, fontWeight: '700',
+    marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5,
+  },
+  estimateRow: {
+    flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4,
+  },
   estimateLabel: { color: '#64748b', fontSize: 13 },
   estimateValue: { color: '#f1f5f9', fontSize: 13, fontWeight: '700' },
-  breakdown: { color: '#475569', fontSize: 11, marginTop: 6, lineHeight: 16 },
-  noVehicle: { color: '#475569', fontSize: 12, fontStyle: 'italic' },
+  breakdown:  { color: '#475569', fontSize: 11, marginTop: 6, lineHeight: 16 },
+  noVehicle:  { color: '#475569', fontSize: 12, fontStyle: 'italic' },
 });
 
 // ── FilterSheet styles ────────────────────────────────
@@ -858,10 +1106,13 @@ const fs = StyleSheet.create({
     width: 40, height: 4, backgroundColor: '#334155',
     borderRadius: 2, alignSelf: 'center', marginBottom: 16,
   },
-  title:    { color: '#f1f5f9', fontSize: 18, fontWeight: '800',
-    marginBottom: 20 },
-  label:    { color: '#64748b', fontSize: 11, fontWeight: '600',
-    textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  title: {
+    color: '#f1f5f9', fontSize: 18, fontWeight: '800', marginBottom: 20,
+  },
+  label: {
+    color: '#64748b', fontSize: 11, fontWeight: '600',
+    textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8,
+  },
   row:      { flexDirection: 'row', gap: 8, marginBottom: 20 },
   chipScroll: { marginBottom: 20 },
   chip: {
