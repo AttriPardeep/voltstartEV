@@ -144,7 +144,10 @@ export const useChargerStore = create<ChargerState>((set, get) => ({
         },
         locationPermission: true
       });
-      get().fetchChargers();
+    // DO NOT call fetchChargers() here
+    // MapScreen already calls fetchChargers() explicitly on mount
+    // Having it here causes the double fetch as seen in logs
+      // get().fetchChargers();
     } catch (err) {
       console.warn('Location error:', err);
       get().fetchChargers();

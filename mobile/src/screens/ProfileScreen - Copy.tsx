@@ -6,8 +6,6 @@ import {
 } from 'react-native';
 import { useAuthStore } from '../store/authStore';
 import { api } from '../utils/api';
-import FleetSection from '../components/FleetSection';
-import RFIDSection from '../components/RFIDSection';
 
 // ─── Vehicle Database ─────────────────────────────────
 interface VehicleSpec {
@@ -91,16 +89,6 @@ interface UserVehicle {
   battery_kwh: number;
   target_soc: number;
   is_primary: number;
-}
-
-// Fleet types
-interface UserFleet {
-  fleet_id: number;
-  fleet_name: string;
-  role: 'admin' | 'driver';
-  billing_mode: 'fleet_pays' | 'driver_pays';
-  monthly_limit?: number | null;
-  is_active: number;
 }
 
 // ─── Add/Edit Vehicle Modal ───────────────────────────
@@ -314,16 +302,12 @@ function VehicleModal({
 }
 
 // ─── Main Screen ──────────────────────────────────────
-export default function ProfileScreen({ navigation }: any) { 
-  const { user, updateUser, logout } = useAuthStore();
+export default function ProfileScreen() {
+  const { user, logout } = useAuthStore();
   const [vehicles, setVehicles] = useState<UserVehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<UserVehicle | null>(null);
-  
-  // Fleet state
-  const [userFleet, setUserFleet] = useState<UserFleet | null>(null);
-  const [fleetLoading, setFleetLoading] = useState(false);
 
   const fetchVehicles = useCallback(async () => {
     try {
@@ -336,26 +320,7 @@ export default function ProfileScreen({ navigation }: any) {
     }
   }, []);
 
-  // Fetch fleet info
-  const fetchFleetInfo = useCallback(async () => {
-    try {
-      setFleetLoading(true);
-      const res = await api.get('/api/fleet/me');
-      if (res.data.success && res.data.data) {
-        setUserFleet(res.data.data);
-      }
-    } catch (err) {
-      // Not in a fleet is OK — just don't show fleet section
-      setUserFleet(null);
-    } finally {
-      setFleetLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { 
-    fetchVehicles();
-    fetchFleetInfo(); 
-  }, []);
+  useEffect(() => { fetchVehicles(); }, []);
 
   const handleAdd = async (data: any) => {
     await api.post('/api/users/me/vehicles', data);
@@ -397,6 +362,7 @@ export default function ProfileScreen({ navigation }: any) {
   };
 
   const primaryVehicle = vehicles.find(v => v.is_primary === 1) || vehicles[0];
+
   return (
     <ScrollView style={s.container} contentContainerStyle={s.content}>
       {/* Avatar */}
@@ -414,42 +380,6 @@ export default function ProfileScreen({ navigation }: any) {
         <InfoRow label="OCPP Tag" value={user?.idTag || '—'} />
         <InfoRow label="Plan" value="Standard" />
       </View>
-	  
-      {/* RFID section — pass callback to refresh profile when tags change */}
-      <RFIDSection />
-      
-      {/* Fleet Section */}
-      {userFleet && (
-        <>
-          <View style={s.sectionHeader}>
-            <Text style={s.sectionTitle}>🚛 Fleet</Text>
-          </View>
-          
-          <TouchableOpacity 
-            style={[s.fleetCard, userFleet.role === 'admin' && s.fleetCardAdmin]}
-            onPress={() => navigation.navigate('FleetDashboard', { fleetId: userFleet.fleet_id })}
-          >
-            <View style={s.fleetHeader}>
-              <Text style={s.fleetIcon}>🏢</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={s.fleetName}>{userFleet.fleet_name}</Text>
-                <Text style={s.fleetRole}>
-                  {userFleet.role === 'admin' ? 'Admin' : 'Driver'} • {userFleet.billing_mode === 'fleet_pays' ? 'Company Pays' : 'You Pay'}
-                </Text>
-              </View>
-              <Text style={s.fleetArrow}>›</Text>
-            </View>
-            
-            {/* Quick stats */}
-            {userFleet.monthly_limit && (
-              <View style={s.fleetStats}>
-                <Text style={s.statLabel}>Monthly Limit</Text>
-                <Text style={s.statValue}>₹{userFleet.monthly_limit.toFixed(0)}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </>
-      )}
 
       {/* Vehicles Section */}
       <View style={s.sectionHeader}>
@@ -538,11 +468,6 @@ export default function ProfileScreen({ navigation }: any) {
         ))
       )}
 
-     {/* ── Fleet Management — only visible to fleet_admin ── */}
-      {user?.role === 'fleet_admin' && (
-        <FleetSection userId={user.userId} />
-      )}
-	  
       {/* Logout */}
       <TouchableOpacity style={s.logoutBtn} onPress={handleLogout}>
         <Text style={s.logoutText}>Logout</Text>
@@ -595,58 +520,6 @@ const s = StyleSheet.create({
   addBtn: { backgroundColor: '#22d3ee', borderRadius: 20,
     paddingHorizontal: 16, paddingVertical: 6 },
   addBtnText: { color: '#0f172a', fontWeight: '700', fontSize: 13 },
-  
-  // Fleet styles
-  fleetCard: {
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  fleetCardAdmin: {
-    borderColor: '#22d3ee',
-    backgroundColor: '#0c4a6e',
-  },
-  fleetHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  fleetIcon: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  fleetName: {
-    color: '#f1f5f9',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  fleetRole: {
-    color: '#64748b',
-    fontSize: 13,
-  },
-  fleetArrow: {
-    color: '#64748b',
-    fontSize: 20,
-  },
-  fleetStats: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 8,
-    marginTop: 4,
-  },
-  statLabel: {
-    color: '#64748b',
-    fontSize: 12,
-  },
-  statValue: {
-    color: '#22d3ee',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  
   emptyCard: { backgroundColor: '#1e293b', borderRadius: 14,
     padding: 28, alignItems: 'center', marginBottom: 16,
     borderWidth: 2, borderColor: '#334155', borderStyle: 'dashed' },

@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoltStartEV Pitch Deck Generator</title>
+<style>
+  body { background:#0f172a; color:#e2e8f0; font-family:system-ui; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; margin:0; }
+  .box { background:#1e293b; padding:2rem; border-radius:16px; text-align:center; max-width:500px; box-shadow:0 8px 30px rgba(0,0,0,0.4); }
+  h1 { color:#0D9488; margin:0 0 0.5rem; }
+  p { color:#94a3b8; margin:0 0 1.5rem; line-height:1.5; }
+  button { background:#0D9488; color:#0f172a; border:none; padding:14px 28px; font-size:16px; font-weight:700; border-radius:10px; cursor:pointer; transition:0.2s; }
+  button:hover { background:#14B8A6; transform:translateY(-1px); }
+  button:disabled { opacity:0.5; cursor:not-allowed; }
+  #status { margin-top:1rem; color:#64748b; font-size:14px; }
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>⚡ VoltStartEV Deck</h1>
+  <p>Generates the full 12-slide investor pitch deck locally in your browser. No cloud, no dependencies.</p>
+  <button id="genBtn">⬇️ Generate & Download PPTX</button>
+  <div id="status"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+<script>
+const C = {
+  navy:"0A0F1E", teal:"0D9488", tealLight:"14B8A6", tealPale:"CCFBF1",
+  white:"FFFFFF", offwhite:"F0FDFA", slate:"1E293B", slateLight:"334155",
+  gray:"64748B", grayLight:"CBD5E1", amber:"F59E0B", amberLight:"FEF3C7",
+  green:"10B981", greenLight:"D1FAE5", red:"EF4444", purple:"7C3AED", purpleLight:"EDE9FE"
+};
+const shadow = { type:"outer", blur:8, offset:3, angle:135, color:"000000", opacity:0.12 };
+const heavyShadow = { type:"outer", blur:16, offset:6, angle:135, color:"000000", opacity:0.18 };
+
+function addStat(s, x, y, w, h, val, lbl, accent, bg) {
+  s.addShape("rect", {x,y,w,h, fill:{color:bg||C.slate}, shadow});
+  s.addShape("rect", {x,y,w,h:0.04, fill:{color:accent}});
+  s.addText(val, {x:x+0.15, y:y+0.25, w:w-0.3, h:0.6, fontSize:26, fontFace:"Arial Black", color:accent, bold:true, align:"center", margin:0});
+  s.addText(lbl, {x:x+0.1, y:y+0.88, w:w-0.2, h:0.45, fontSize:10, fontFace:"Calibri", color:C.grayLight, align:"center", margin:0});
+}
+
+function addPill(s, x, y, w, h, emoji, title, desc, accent) {
+  s.addShape("rect", {x,y,w,h, fill:{color:C.slate}, shadow});
+  s.addShape("rect", {x,y,w:0.05,h, fill:{color:accent}});
+  s.addText(emoji, {x:x+0.15, y:y+0.08, w:0.5, h:0.5, fontSize:22, align:"center", margin:0});
+  s.addText(title, {x:x+0.7, y:y+0.08, w:w-0.85, h:0.32, fontSize:13, fontFace:"Arial Black", color:C.white, bold:true, margin:0});
+  s.addText(desc, {x:x+0.7, y:y+0.4, w:w-0.85, h:0.45, fontSize:10, fontFace:"Calibri", color:C.grayLight, margin:0});
+}
+
+async function build() {
+  const pres = new PptxGenJS();
+  pres.layout = "LAYOUT_16x9";
+  pres.title = "VoltStartEV — Investor & Client Pitch";
+  pres.author = "VoltStartEV Engineering";
+
+  // SLIDE 1 — Hero
+  { const s = pres.addSlide(); s.background={color:C.navy};
+    s.addShape("rect",{x:0,y:0,w:0.06,h:5.625,fill:{color:C.teal}});
+    s.addText("⚡",{x:7.2,y:0.3,w:2.8,h:2.8,fontSize:120,color:C.teal,align:"center",valign:"middle",transparency:82});
+    s.addText("INTRODUCING",{x:0.5,y:0.7,w:6,h:0.35,fontSize:10,color:C.tealLight,bold:true,charSpacing:5,margin:0});
+    s.addText("VoltStartEV",{x:0.5,y:1.0,w:7,h:1.2,fontSize:64,color:C.white,bold:true,margin:0});
+    s.addShape("rect",{x:0.5,y:2.25,w:3.4,h:0.06,fill:{color:C.teal}});
+    s.addText("India's Smartest EV Charging Platform",{x:0.5,y:2.45,w:8,h:0.55,fontSize:20,color:C.grayLight,italic:true,margin:0});
+    const pills=["⚡ OCPP 1.6\nNative","🤖 AI\nAssistant","📱 Real-time\nTelemetry"];
+    pills.forEach((p,i)=>{const x=0.5+i*2.2;
+      s.addShape("rect",{x,y:3.5,w:1.9,h:1.5,fill:{color:C.slate},shadow});
+      s.addShape("rect",{x,y:3.5,w:1.9,h:0.05,fill:{color:C.teal}});
+      s.addText(p,{x,y:3.6,w:1.9,h:1.2,fontSize:11,color:C.grayLight,align:"center",margin:0});
+    });
+    s.addText("April 2026 | Confidential",{x:7,y:5.2,w:2.8,h:0.3,fontSize:9,color:C.gray,align:"right",margin:0});
+  }
+
+  // SLIDE 2 — Problem
+  { const s=pres.addSlide(); s.background={color:C.navy};
+    s.addText("THE PROBLEM",{x:0.5,y:0.3,w:9,h:0.3,fontSize:9,color:C.teal,bold:true,charSpacing:5,margin:0});
+    s.addText("India's EV Charging Gap",{x:0.5,y:0.6,w:9,h:0.7,fontSize:32,color:C.white,bold:true,margin:0});
+    s.addShape("rect",{x:0.5,y:1.3,w:1.8,h:0.05,fill:{color:C.teal}});
+    const probs=[
+      {i:"🏷️",t:"No White-Label Solutions",b:"Indian operators run SteVe/OCPP with zero branded UX. Drivers use generic dashboards or nothing.",c:C.red},
+      {i:"💰",t:"Fixed Flat-Rate Pricing",b:"₹8–10/kWh regardless of power, time, or location. Revenue left on the table.",c:C.amber},
+      {i:"📵",t:"Offline Blind Spots",b:"Drivers arrive to find chargers occupied, faulted, or offline. No real-time status.",c:C.purple},
+      {i:"🧩",t:"Zero App Intelligence",b:"No AI, no route planning, no session analytics. Just a start/stop button.",c:C.tealLight}
+    ];
+    probs.forEach((p,i)=>{const x=0.5+(i%2)*4.7, y=1.6+Math.floor(i/2)*1.85;
+      s.addShape("rect",{x,y,w:4.3,h:1.65,fill:{color:C.slate},shadow});
+      s.addShape("rect",{x,y,w:0.06,h:1.65,fill:{color:p.c}});
+      s.addText(p.i,{x:x+0.15,y:y+0.15,w:0.6,h:0.6,fontSize:24,margin:0});
+      s.addText(p.t,{x:x+0.85,y:y+0.1,w:3.3,h:0.35,fontSize:13,color:C.white,bold:true,margin:0});
+      s.addText(p.b,{x:x+0.85,y:y+0.48,w:3.3,h:1.05,fontSize:10,color:C.grayLight,margin:0});
+    });
+  }
+
+  // SLIDE 3 — Solution
+  { const s=pres.addSlide(); s.background={color:C.navy};
+    s.addText("OUR SOLUTION",{x:0.5,y:0.3,w:9,h:0.3,fontSize:9,color:C.teal,bold:true,charSpacing:5,margin:0});
+    s.addText("One Platform. Built for India.",{x:0.5,y:0.6,w:9,h:0.7,fontSize:32,color:C.white,bold:true,margin:0});
+    s.addShape("rect",{x:0.5,y:1.28,w:2.0,h:0.05,fill:{color:C.teal}});
+    const layers=[
+      {l:"Mobile App (React Native + Expo)",it:"Map · Session · Wallet · AI Chat · RFID · Fleet",c:C.teal,y:1.55},
+      {l:"Backend API (Node.js + TypeScript)",it:"OCPP Webhooks · Pricing Engine · WebSocket · Razorpay · JWT Auth",c:C.amber,y:2.5},
+      {l:"OCPP Infrastructure (SteVe 1.6)",it:"RemoteStart · RemoteStop · ReserveNow · MeterValues · StatusNotification",c:C.purple,y:3.45}
+    ];
+    layers.forEach((l,i)=>{
+      s.addShape("rect",{x:0.5,y:l.y,w:9,h:0.82,fill:{color:C.slate},shadow});
+      s.addShape("rect",{x:0.5,y:l.y,w:0.06,h:0.82,fill:{color:l.c}});
+      s.addText(l.l,{x:0.7,y:l.y+0.06,w:8.6,h:0.3,fontSize:13,color:C.white,bold:true,margin:0});
+      s.addText(l.it,{x:0.7,y:l.y+0.4,w:8.6,h:0.3,fontSize:11,color:C.grayLight,margin:0});
+      if(i<2) s.addShape("rect",{x:4.85,y:l.y+0.82,w:0.3,h:0.18,fill:{color:l.c}});
+    });
+    addStat(s,0.5,4.55,2.1,0.92,"12","Chargers Live",C.teal);
+    addStat(s,2.8,4.55,2.1,0.92,"OCPP 1.6","Protocol",C.amber);
+    addStat(s,5.1,4.55,2.1,0.92,"Real-time","Telemetry",C.green);
+    addStat(s,7.4,4.55,2.1,0.92,"Razorpay","Payments",C.purple);
+  }
+
+  // SLIDE 4 — AI Assistant
+  { const s=pres.addSlide(); s.background={color:C.navy};
+    s.addShape("rect",{x:0,y:0,w:4.5,h:5.625,fill:{color:"0A2020"}});
+    s.addShape("rect",{x:0,y:0,w:0.06,h:5.625,fill:{color:C.teal}});
+    s.addShape("rect",{x:0.3,y:0.4,w:2.5,h:0.36,fill:{color:C.teal},shadow});
+    s.addText("🏆 NOT IN ANY COMPETITOR",{x:0.3,y:0.4,w:2.5,h:0.36,fontSize:9,color:C.white,bold:true,align:"center",margin:0});
+    s.addText("🤖",{x:1.7,y:0.95,w:1.1,h:1.1,fontSize:72,align:"center",valign:"middle",margin:0});
+    s.addText("Volt AI",{x:0.2,y:2.1,w:4.0,h:0.7,fontSize:38,color:C.tealLight,bold:true,align:"center",margin:0});
+    s.addText("Powered by Claude Sonnet",{x:0.2,y:2.78,w:4.0,h:0.3,fontSize:11,color:C.gray,align:"center",margin:0});
+    const chats=[
+      {w:"User",m:"\"Find nearest DC fast charger\"",a:"right",c:C.teal},
+      {w:"Volt",m:"CS-DC150K-00002 is 1.2km away — Available. Navigate?",a:"left",c:C.slate},
+      {w:"User",m:"\"Stop charging\"",a:"right",c:C.teal},
+      {w:"Volt",m:"Session stopped. 10.79 kWh · ₹272 charged · 3.6kg CO₂ saved.",a:"left",c:C.slate}
+    ];
+    chats.forEach((c,i)=>{const bx=c.a==="right"?0.3:0.6;
+      s.addShape("rect",{x:bx,y:3.38+i*0.5,w:3.6,h:0.42,fill:{color:c.c},shadow});
+      s.addText(c.m,{x:bx+0.1,y:3.38+i*0.5,w:3.4,h:0.42,fontSize:9.5,color:C.white,align:c.a,italic:c.a==="right",margin:0});
+    });
+    s.addText("What Volt Can Do",{x:4.8,y:0.4,w:4.9,h:0.45,fontSize:22,color:C.white,bold:true,margin:0});
+    s.addShape("rect",{x:4.8,y:0.88,w:1.6,h:0.05,fill:{color:C.teal}});
+    const caps=[
+      {i:"🗺️",t:"Find & Navigate",d:"Natural language charger search with live availability"},
+      {i:"⚡",t:"Start / Stop",d:"Voice or text commands trigger real OCPP actions"},
+      {i:"📊",t:"Session Insights",d:"\"How much did I spend this month?\" — answered instantly"},
+      {i:"🔍",t:"Smart Filters",d:"\"Fast chargers only\" → filters map automatically"},
+      {i:"🌐",t:"Context-Aware",d:"Knows your vehicle, active session, wallet balance"}
+    ];
+    caps.forEach((c,i)=>{const y=1.1+i*0.87;
+      s.addShape("rect",{x:4.8,y,w:4.9,h:0.77,fill:{color:C.slate},shadow});
+      s.addText(c.i,{x:4.95,y:y+0.1,w:0.5,h:0.55,fontSize:22,margin:0});
+      s.addText(c.t,{x:5.55,y:y+0.05,w:4.0,h:0.3,fontSize:13,color:C.white,bold:true,margin:0});
+      s.addText(c.d,{x:5.55,y:y+0.38,w:4.0,h:0.32,fontSize:10,color:C.grayLight,margin:0});
+    });
+  }
+
+  // SLIDE 5 — Pricing
+  { const s=pres.addSlide(); s.background={color:C.navy};
+    s.addText("PRICING ENGINE",{x:0.5,y:0.3,w:9,h:0.3,fontSize:9,color:C.amber,bold:true,charSpacing:5,margin:0});
+    s.addText("Power-Based Dynamic Pricing",{x:0.5,y:0.6,w:9,h:0.65,fontSize:30,color:C.white,bold:true,margin:0});
+    s.addText("India locks chargers at flat ₹8–10/kWh. We price intelligently based on power, time & demand.",{x:0.5,y:1.28,w:9,h:0.38,fontSize:12,color:C.grayLight,margin:0});
+    const models=[
+      {n:"Per kWh",i:"⚡",e:"₹7.50/kWh",d:"AC Home Chargers\n7kW–22kW",c:C.green},
+      {n:"Per Minute",i:"⏱️",e:"₹2/min",d:"Destination Charging\nBusy locations",c:C.tealLight},
+      {n:"Tiered Power",i:"📈",e:"₹16→₹28/kWh",d:"HPC 350kW\nPremium tier",c:C.amber},
+      {n:"Time-of-Use",i:"🌙",e:"₹6 night / ₹14 peak",d:"Smart Grid Aligned\nOff-peak reward",c:C.purple},
+      {n:"Session Fee",i:"🎟️",e:"₹25–₹100",d:"DC Fast Chargers\nReservation access",c:C.red}
+    ];
+    models.forEach((m,i)=>{const x=0.5+(i%3)*3.05, y=1.9+Math.floor(i/3)*1.75, w=2.85, h=1.6;
+      s.addShape("rect",{x,y,w,h,fill:{color:C.slate},shadow});
+      s.addShape("rect",{x,y,w,h:0.06,fill:{color:m.c}});
+      s.addText(m.i,{x,y:y+0.12,w,h:0.55,fontSize:26,align:"center",margin:0});
+      s.addText(m.n,{x,y:y+0.68,w,h:0.28,fontSize:12,color:m.c,bold:true,align:"center",margin:0});
+      s.addText(m.e,{x,y:y+0.95,w,h:0.28,fontSize:13,color:C.white,align:"center",margin:0});
+      s.addText(m.d,{x,y:y+1.22,w,h:0.32,fontSize:9.5,color:C.grayLight,align:"center",margin:0});
+    });
+    s.addShape("rect",{x:0.5,y:5.1,w:9,h:0.38,fill:{color:"0A2A1A"},shadow});
+    s.addShape("rect",{x:0.5,y:5.1,w:0.06,h:0.38,fill:{color:C.green}});
+    s.addText("💡 Tiered pricing on 350kW HPC delivers 2.1× revenue vs flat-rate — without changing hardware",{x:0.7,y:5.1,w:9.0,h:0.38,fontSize:11,color:C.green,align:"left",valign:"middle",margin:0});
+  }
+
+  // SLIDE 6 — Market Gap
+  { const s=pres.addSlide(); s.background={color:C.navy};
+    s.addText("MARKET GAP",{x:0.5,y:0.3,w:9,h:0.3,fontSize:9,color:C.teal,bold:true,charSpacing:5,margin:0});
+    s.addText("White-Label Infrastructure India Is Missing",{x:0.5,y:0.6,w:9,h:0.65,fontSize:28,color:C.white,bold:true,margin:0});
+    const cols=["Feature","Generic OCPP Apps","VoltStartEV"];
+    const rows=[
+      ["Branded mobile app","❌ No","✅ Full custom branding"],
+      ["Dynamic power-based pricing","❌ No","✅ 5 pricing models"],
+      ["AI charging assistant","❌ No","✅ Volt (Claude-powered)"],
+      ["RFID + app hybrid auth","❌ No","✅ External RFID + app tag"],
+      ["Real-time telemetry in-app","❌ No","✅ WebSocket 5s updates"],
+      ["Reservation system","❌ No","✅ OCPP ReserveNow native"],
+      ["Fleet / corporate accounts","❌ No","✅ Multi-vehicle + invoicing"],
+      ["Wallet + Razorpay UPI","❌ No","✅ Pre-loaded + auto-deduct"],
+      ["Monthly CO₂ / usage reports","Partial","✅ Email reports + PDF"],
+      ["Offline mode + cache","❌ No","✅ AsyncStorage fallback"]
+    ];
+    s.addShape("rect",{x:0.4,y:1.5,w:9.2,h:0.38,fill:{color:C.teal}});
+    cols.forEach((c,i)=>{const ws=[3.2,2.8,3.2], xs=[0.5,3.7,6.5];
+      s.addText(c,{x:xs[i],y:1.5,w:ws[i],h:0.38,fontSize:11,color:C.white,bold:true,align:"center",margin:0});
+    });
+    rows.forEach((r,ri)=>{const bg=ri%2===0?C.slate:C.navy;
+      s.addShape("rect",{x:0.4,y:1.9+ri*0.36,w:9.2,h:0.36,fill:{color:bg}});
+      const xs=[0.5,3.7,6.5], ws=[3.2,2.8,3.2], cs=[C.white,C.red,C.green];
+      r.forEach((cell,ci)=>{
+        s.addText(cell,{x:xs[ci],y:1.9+ri*0.36,w:ws[ci],h:0.36,fontSize:10,color:ci===0?C.grayLight:cs[ci],align:ci===0?"left":"center",bold:ci>0,margin:0});
+      });
+    });
+  }
+
+  // SLIDE 7 — Features
+  { const s=pres.addSlide(); s.background={color:C.navy};
+    s.addText("PLATFORM FEATURES",{x:0.5,y:0.3,w:9,h:0.3,fontSize:9,color:C.teal,bold:true,charSpacing:5,margin:0});
+    s.addText("Built for Real-World EV Charging",{x:0.5,y:0.6,w:9,h:0.65,fontSize:30,color:C.white,bold:true,margin:0});
+    const feats=[
+      {e:"🗺️",t:"Live Map + Filters",d:"Availability, power, price, distance filters. Real-time status from OCPP.",c:C.teal},
+      {e:"🔋",t:"Session Screen",d:"Live power, energy, cost, SOC bar, sparkline, stale data indicator.",c:C.tealLight},
+      {e:"💰",t:"Wallet + Razorpay",d:"Pre-loaded balance, UPI/GPay/Cards, auto-deduct on session end.",c:C.amber},
+      {e:"📋",t:"History + Analytics",d:"Full session history, monthly reports, CO₂ saved, cost per kWh.",c:C.green},
+      {e:"🕐",t:"Reservation System",d:"OCPP native ReserveNow, 30-min lock, auto-cancel, map indicator.",c:C.purple},
+      {e:"🏢",t:"Fleet Management",d:"Corporate accounts, per-driver limits, OCPP tag auto-generation.",c:C.red},
+      {e:"💳",t:"RFID Card Support",d:"External RFID fobs registered from app. Any 13.56MHz card works.",c:C.tealLight},
+      {e:"🌱",t:"Efficiency Insights",d:"Charging loss calculation, CO₂ saved, petrol equivalent per session.",c:C.green}
+    ];
+    feats.forEach((f,i)=>{const col=i%2, row=Math.floor(i/2), x=0.5+col*4.75, y=1.55+row*1.0;
+      addPill(s,x,y,4.4,0.88,f.e,f.t,f.d,f.c);
+    });
+  }
+
+  // SLIDE 8 — Architecture
+  { const s=pres.addSlide(); s.background={color:C.navy};
+    s.addText("TECHNICAL ARCHITECTURE",{x:0.5,y:0.3,w:9,h:0.3,fontSize:9,color:C.teal,bold:true,charSpacing:5,margin:0});
+    s.addText("How Real-Time Telemetry Flows",{x:0.5,y:0.6,w:9,h:0.65,fontSize:30,color:C.white,bold:true,margin:0});
+    const nodes=[
+      {l:"Physical\nCharger",i:"🔌",x:0.3,y:1.7,w:1.6,c:C.slate},
+      {l:"SteVe OCPP\nServer",i:"⚙️",x:2.3,y:1.7,w:1.6,c:C.slateLight},
+      {l:"Backend\nWebhook",i:"🔗",x:4.3,y:1.7,w:1.6,c:C.slate},
+      {l:"WebSocket\nEmitter",i:"📡",x:6.3,y:1.7,w:1.6,c:C.slateLight},
+      {l:"Mobile\nApp",i:"📱",x:8.3,y:1.7,w:1.6,c:C.teal}
+    ];
+    nodes.forEach((n,i)=>{
+      s.addShape("rect",{x:n.x,y:n.y,w:n.w,h:1.2,fill:{color:n.c},shadow});
+      if(n.c===C.teal) s.addShape("rect",{x:n.x,y:n.y,w:n.w,h:0.06,fill:{color:C.tealLight}});
+      s.addText(n.i,{x:n.x,y:n.y+0.1,w:n.w,h:0.45,fontSize:22,align:"center",margin:0});
+      s.addText(n.l,{x:n.x,y:n.y+0.6,w:n.w,h:0.55,fontSize:10,color:C.white,align:"center",margin:0});
+      if(i<nodes.length-1){s.addShape("rect",{x:n.x+n.w+0.02,y:n.y+0.56,w:0.37,h:0.08,fill:{color:C.teal}}); s.addText("▶",{x:n.x+n.w+0.25,y:n.y+0.45,w:0.25,h:0.3,fontSize:12,color:C.teal,margin:0});}
+    });
+    const labs=["OCPP 1.6\nWebSocket","HTTP\nWebhook POST","MySQL\nEvent Queue","Socket.io\n5s cadence"];
+    labs.forEach((l,i)=>s.addText(l,{x:1.9+i*2.0,y:3.05,w:1.8,h:0.5,fontSize:9,color:C.gray,align:"center",margin:0}));
+    addStat(s,0.5,3.8,2.1,1.1,"< 5s","Telemetry Lag",C.teal);
+    addStat(s,2.8,3.8,2.1,1.1,"OCPP 1.6","Protocol",C.amber);
+    addStat(s,5.1,3.8,2.1,1.1,"WS + Poll","Fallback",C.green);
+    addStat(s,7.4,3.8,2.1,1.1,"99.9%","Reconciliation",C.purple);
+  }
+
+  // SLIDE 9 — Security & Payments
+  { const s=pres.addSlide(); s.background={color:C.navy};
+    s.addText("SECURITY & PAYMENTS",{x:0.5,y:0.3,w:9,h:0.3,fontSize:9,color:C.purple,bold:true,charSpacing:5,margin:0});
+    s.addText("Production-Grade Security Stack",{x:0.5,y:0.6,w:9,h:0.65,fontSize:30,color:C.white,bold:true,margin:0});
+    s.addText("🔐 Authentication & Security",{x:0.5,y:1.45,w:4.3,h:0.38,fontSize:15,color:C.white,bold:true,margin:0});
+    const sec=[["JWT 30-day tokens","expo-secure-store (encrypted)"],["OTP email verification","SHA-256 hashed, 3-min TTL"],["Rate limiting on auth","10 attempts / 15 minutes"],["Input validation","Zod schemas on all endpoints"],["OCPP tag isolation","Per-user unique VSE-{id} tags"]];
+    sec.forEach((it,i)=>{
+      s.addShape("rect",{x:0.5,y:1.95+i*0.62,w:4.3,h:0.55,fill:{color:C.slate},shadow});
+      s.addShape("rect",{x:0.5,y:1.95+i*0.62,w:0.05,h:0.55,fill:{color:C.purple}});
+      s.addText("✓ "+it[0],{x:0.65,y:1.95+i*0.62+0.05,w:4.0,h:0.24,fontSize:11,color:C.white,bold:true,margin:0});
+      s.addText(it[1],{x:0.65,y:1.95+i*0.62+0.28,w:4.0,h:0.2,fontSize:9.5,color:C.grayLight,margin:0});
+    });
+    s.addText("💳 Payments (Razorpay)",{x:5.2,y:1.45,w:4.5,h:0.38,fontSize:15,color:C.white,bold:true,margin:0});
+    const pm=[{i:"📱",n:"UPI / GPay / PhonePe",c:C.green},{i:"💳",n:"Debit & Credit Cards",c:C.teal},{i:"🏦",n:"Net Banking",c:C.amber}];
+    pm.forEach((p,i)=>{
+      s.addShape("rect",{x:5.2,y:1.95+i*0.75,w:4.5,h:0.65,fill:{color:C.slate},shadow});
+      s.addShape("rect",{x:5.2,y:1.95+i*0.75,w:0.05,h:0.65,fill:{color:p.c}});
+      s.addText(p.i+"   "+p.n,{x:5.35,y:1.95+i*0.75+0.18,w:4.1,h:0.3,fontSize:13,color:C.white,margin:0});
+    });
+    s.addShape("rect",{x:5.2,y:4.25,w:4.5,h:1.1,fill:{color:"0A1A0E"},shadow});
+    s.addShape("rect",{x:5.2,y:4.25,w:0.05,h:1.1,fill:{color:C.green}});
+    s.addText("Pre-Loaded Wallet Flow",{x:5.35,y:4.32,w:4.2,h:0.3,fontSize:12,color:C.green,bold:true,margin:0});
+    s.addText("Load ₹500 → Session ends → Auto-deduct → Push alert if low",{x:5.35,y:4.65,w:4.2,h:0.6,fontSize:10,color:C.grayLight,margin:0});
+  }
+
+  // SLIDE 10 — Roadmap
+  { const s=pres.addSlide(); s.background={color:C.navy};
+    s.addText("FUTURE ROADMAP",{x:0.5,y:0.3,w:9,h:0.3,fontSize:9,color:C.amber,bold:true,charSpacing:5,margin:0});
+    s.addText("What's Coming Next",{x:0.5,y:0.6,w:9,h:0.65,fontSize:30,color:C.white,bold:true,margin:0});
+    const phases=[
+      {p:"Phase 2 — Q3 2026",c:C.teal,it:["🎤 Voice Commands (hands-free in car)","📲 SMS OTP fallback for registration","🎟️ Booking / advance reservation","⭐ Post-session charger ratings"]},
+      {p:"Phase 3 — Q4 2026",c:C.amber,it:["🗺️ Route planner with charging stops","🏷️ Loyalty points per kWh charged","🔌 Guest / QR charging (no app needed)","📊 Fleet real-time dashboard (web)"]},
+      {p:"Phase 4 — Q1 2027",c:C.purple,it:["🌙 Smart overnight scheduling","📱 Android Auto / CarPlay integration","🌿 Carbon credit partnerships","🤝 B2B operator white-label portal"]}
+    ];
+    phases.forEach((ph,i)=>{const x=0.4+i*3.2;
+      s.addShape("rect",{x,y:1.55,w:3.0,h:3.8,fill:{color:C.slate},shadow});
+      s.addShape("rect",{x,y:1.55,w:3.0,h:0.06,fill:{color:ph.c}});
+      s.addShape("rect",{x:x+0.15,y:1.7,w:2.7,h:0.32,fill:{color:ph.c}});
+      s.addText(ph.p,{x:x+0.15,y:1.7,w:2.7,h:0.32,fontSize:10,color:C.white,bold:true,align:"center",margin:0});
+      ph.it.forEach((item,ii)=>{
+        s.addText(item,{x:x+0.15,y:2.15+ii*0.78,w:2.7,h:0.65,fontSize:11,color:C.grayLight,margin:0});
+        if(ii<ph.it.length-1) s.addShape("rect",{x:x+0.15,y:2.78+ii*0.78,w:2.7,h:0.01,fill:{color:C.slateLight}});
+      });
+    });
+    s.addShape("rect",{x:0.4,y:5.1,w:9.2,h:0.38,fill:{color:"1A1500"},shadow});
+    s.addShape("rect",{x:0.4,y:5.1,w:0.06,h:0.38,fill:{color:C.amber}});
+    s.addText('🎤 VOICE: "Hey Volt, start charging on connector 2" → OCPP RemoteStart fires instantly via Claude + expo-speech',{x:0.6,y:5.1,w:9.0,h:0.38,fontSize:11,color:C.amber,valign:"middle",margin:0});
+  }
+
+  // SLIDE 11 — Market
+  { const s=pres.addSlide(); s.background={color:C.navy};
+    s.addText("MARKET OPPORTUNITY",{x:0.5,y:0.3,w:9,h:0.3,fontSize:9,color:C.green,bold:true,charSpacing:5,margin:0});
+    s.addText("India's EV Charging Market",{x:0.5,y:0.6,w:9,h:0.65,fontSize:30,color:C.white,bold:true,margin:0});
+    addStat(s,0.4,1.5,2.15,1.55,"₹12,000 Cr","EV Charging Market\nby 2027 (NITI Aayog)",C.teal);
+    addStat(s,2.7,1.5,2.15,1.55,"3.8M+","EVs on Indian Roads\n(FY2024)",C.green);
+    addStat(s,5.0,1.5,2.15,1.55,"68,000+","Public Charging Points\nNeeded by 2030",C.amber);
+    addStat(s,7.3,1.5,2.15,1.55,"2%","Current Charging\nNetwork Coverage",C.red);
+    s.addChart(pres.charts.BAR,[{name:"Market Size (₹ Crore)",labels:["FY24","FY25","FY26","FY27","FY28"],values:[1800,3200,5600,9100,14500]}],{
+      x:0.4,y:3.25,w:5.8,h:2.1,barDir:"col",chartColors:[C.teal],chartArea:{fill:{color:C.slate}},catAxisLabelColor:C.grayLight,valAxisLabelColor:C.grayLight,valGridLine:{color:C.slateLight,size:0.5},catGridLine:{style:"none"},showValue:true,dataLabelColor:C.white,showLegend:false,showTitle:true,title:"India EV Charging Market Growth (₹ Cr)",titleColor:C.grayLight,titleFontSize:11
+    });
+    s.addText("Why Now",{x:6.5,y:3.25,w:3.2,h:0.38,fontSize:16,color:C.white,bold:true,margin:0});
+    const ops=[{i:"🏛️",t:"FAME III Subsidy",d:"Govt ₹500Cr for charging infra"},{i:"⛽",t:"Petrol at ₹103/L",d:"EV TCO now 40% cheaper"},{i:"🔋",t:"Battery < $100/kWh",d:"EV sticker price approaching ICE"},{i:"📱",t:"850M Smartphone Users",d:"App-first charging natural fit"}];
+    ops.forEach((o,i)=>{
+      s.addShape("rect",{x:6.5,y:3.75+i*0.4,w:3.2,h:0.35,fill:{color:C.slate},shadow});
+      s.addText(o.i+"   "+o.t,{x:6.6,y:3.75+i*0.4,w:3.0,h:0.2,fontSize:10,color:C.white,bold:true,margin:0});
+      s.addText(o.d,{x:6.6,y:3.95+i*0.4,w:3.0,h:0.15,fontSize:8.5,color:C.grayLight,margin:0});
+    });
+  }
+
+  // SLIDE 12 — Closing
+  { const s=pres.addSlide(); s.background={color:C.navy};
+    s.addShape("rect",{x:0,y:0,w:0.08,h:5.625,fill:{color:C.teal}});
+    s.addText("⚡",{x:6.5,y:0.5,w:3.3,h:3.3,fontSize:180,color:C.teal,align:"center",valign:"middle",transparency:88});
+    s.addText("READY TO CHARGE INDIA",{x:0.5,y:0.9,w:8.5,h:0.4,fontSize:11,color:C.teal,bold:true,charSpacing:5,margin:0});
+    s.addText("VoltStartEV",{x:0.5,y:1.3,w:8,h:1.3,fontSize:72,color:C.white,bold:true,margin:0});
+    s.addText("The only EV charging platform built from the ground up\nfor Indian operators, drivers, and fleets.",{x:0.5,y:2.65,w:7,h:0.7,fontSize:16,color:C.grayLight,margin:0});
+    const ctas=[{i:"🔌",t:"Operator?",b:"White-label the platform\nfor your charging network",c:C.teal},{i:"🏢",t:"Enterprise?",b:"Fleet management\n+ bulk charging rates",c:C.amber},{i:"💡",t:"Investor?",b:"Join India's EV\ninfrastructure revolution",c:C.purple}];
+    ctas.forEach((c,i)=>{const x=0.5+i*3.0;
+      s.addShape("rect",{x,y:3.65,w:2.75,h:1.6,fill:{color:C.slate},shadow:heavyShadow});
+      s.addShape("rect",{x,y:3.65,w:2.75,h:0.07,fill:{color:c.c}});
+      s.addText(c.i,{x,y:3.75,w:2.75,h:0.5,fontSize:26,align:"center",margin:0});
+      s.addText(c.t,{x,y:4.25,w:2.75,h:0.32,fontSize:15,color:c.c,bold:true,align:"center",margin:0});
+      s.addText(c.b,{x,y:4.58,w:2.75,h:0.6,fontSize:10,color:C.grayLight,align:"center",margin:0});
+    });
+    s.addText("⚡ voltstartev.com | github.com/AttriPardeep/VoltStartEV",{x:0.5,y:5.35,w:9,h:0.22,fontSize:10,color:C.gray,align:"center",margin:0});
+  }
+
+  const out = await pres.writeFile({ fileName: "VoltStartEV_Pitch_Deck.pptx" });
+  // PptxGenJS in browser auto-triggers download. We just signal success.
+  return true;
+}
+
+document.getElementById("genBtn").addEventListener("click", async () => {
+  const btn = document.getElementById("genBtn");
+  const st = document.getElementById("status");
+  btn.disabled = true; btn.textContent = "Generating...";
+  st.textContent = "Building 12 slides...";
+  try {
+    await build();
+    st.textContent = "✅ Download started! Check your downloads folder.";
+    st.style.color = "#22c55e";
+  } catch(e) {
+    st.textContent = "❌ Error: " + e.message;
+    st.style.color = "#ef4444";
+  } finally {
+    btn.disabled = false; btn.textContent = "⬇️ Generate & Download PPTX";
+  }
+});
+</script>
+</body>
+</html>

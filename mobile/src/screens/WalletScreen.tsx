@@ -39,7 +39,7 @@ function TxRow({ tx }: { tx: any }) {
       </View>
       <View style={tx_s.amountWrap}>
         <Text style={[tx_s.amount,
-          { color: isCredit ? '#22c55e' : '#f1f5f9' }]}>
+          { color: isCredit ? '#22c55e' : '#ff3434' }]}>
           {isCredit ? '+' : '-'}₹{tx.amount.toFixed(2)}
         </Text>
         <Text style={tx_s.balance}>

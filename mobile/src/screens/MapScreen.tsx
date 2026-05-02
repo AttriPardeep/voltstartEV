@@ -12,6 +12,7 @@ import { useAuthStore } from '../store/authStore';
 import { useFilterStore } from '../store/filterStore';
 import AssistantChat from '../components/AssistantChat';
 import { api } from '../utils/api';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const STATUS_COLOR: Record<string, string> = {
   Available:   '#22c55e',
@@ -59,8 +60,6 @@ const ChargerMarker = React.memo(({ charger, onPress, isReserved }: {
   isReserved: boolean;
 }) => {
   // tracksViewChanges fix: allow one render cycle to measure, then lock
-  const [rendered, setRendered] = useState(false);
-
   const bgColor =
     isReserved              ? '#7c3aed' :   // purple for reserved
     charger.status === 'Available' ? '#10b981' :
@@ -78,17 +77,21 @@ const ChargerMarker = React.memo(({ charger, onPress, isReserved }: {
       anchor={{ x: 0.5, y: 1 }}
       // true until first layout, then false — stops flicker AND
       // ensures correct size on Fabric/New Architecture
-      tracksViewChanges={!rendered}
+      tracksViewChanges={false}
       stopPropagation
     >
       {/* explicit px dimensions required on Fabric */}
       <View
         style={{ width: MARKER_W + 12, height: MARKER_H + 10, alignItems: 'center' }}
-        onLayout={() => setRendered(true)}
       >
         <View style={[sq.badge, { backgroundColor: bgColor }]}>
           {/* Reservation icon overrides ⚡ when this connector is reserved */}
-          <Text style={sq.icon}>{isReserved ? '🕐' : '⚡'}</Text>
+          <MaterialCommunityIcons
+            name={isReserved ? 'clock-outline' : 'lightning-bolt'}
+            size={16}
+            color="#fff"
+            style={sq.icon}
+          />
           <Text style={sq.count}>{connectorLabel}</Text>
         </View>
         <View style={[sq.pointer, { borderTopColor: bgColor }]} />
@@ -407,7 +410,7 @@ export default function MapScreen({ navigation }: any) {
     requestLocation();
     fetchActiveSession();
     fetchChargers();
-
+    
     // 2 min polling instead of 30s — WebSocket handles real-time updates
     const interval = setInterval(fetchChargers, 2 * 60 * 1000);
     return () => clearInterval(interval);
@@ -478,6 +481,15 @@ export default function MapScreen({ navigation }: any) {
   };
 
   const handleStartCharging = async () => {
+    // Block charging when offline — suggest RFID instead
+    if (isOffline) {
+      Alert.alert(
+        'Offline Mode',
+        'Charging cannot be started while offline. Please tap your registered RFID card on the charger to begin charging.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }	  
     if (startingRef.current) return;
     if (!selected || !selectedConnector) {
       Alert.alert('Select Connector', 'Please select a connector first.');
@@ -492,7 +504,17 @@ export default function MapScreen({ navigation }: any) {
     startingRef.current = true;
     setStarting(true);
     try {
-      const idTag = user?.idTag || 'QATEST001';
+      const idTag = user?.idTag;
+      if (!idTag) {
+        Alert.alert(
+          'Account Setup Incomplete',
+          'Your charging tag is not set up yet. Please log out and log back in.',
+          [{ text: 'OK' }]
+        );
+        setStarting(false);
+        startingRef.current = false;
+        return;
+      }	  
       await startSession(selected.chargeBoxId, selectedConnector, idTag);
       setModalVisible(false);
       setSelectedConnector(null);
@@ -524,13 +546,22 @@ export default function MapScreen({ navigation }: any) {
   };
 
   const handleReserve = async () => {
+    //Block reservation when offline
+    if (isOffline) {
+      Alert.alert(
+        'Offline Mode',
+        'Reservations cannot be made while offline. Please connect to Team to reserve a charger.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }	  
     if (!selected || !selectedConnector) return;
     setReserving(true);
     try {
       const res = await api.post('/api/reservations', {
         chargeBoxId: selected.chargeBoxId,
         connectorId: selectedConnector,
-      });
+      },{ timeout: 60000 });
       const newReservation = res.data.data;
       setActiveReservation(newReservation);
 
