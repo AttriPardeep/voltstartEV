@@ -1,0 +1,57 @@
+import 'dotenv/config';
+
+export default {
+  expo: {
+    name: "VoltStartEV",
+    slug: "voltstartev",
+    version: "1.0.0",
+    orientation: "portrait",
+    icon: "./assets/icon.png",
+    userInterfaceStyle: "light",
+    newArchEnabled: false,
+
+    splash: {
+      image: "./assets/splash-icon.png",
+      resizeMode: "contain",
+      backgroundColor: "#ffffff"
+    },
+
+    ios: {
+      supportsTablet: true,
+      bundleIdentifier: "com.voltstartev.mobile",
+      config: {
+        googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY
+      }
+    },
+
+    android: {
+      package: "com.voltstartev.mobile",
+
+      adaptiveIcon: {
+        foregroundImage: "./assets/adaptive-icon.png",
+        backgroundColor: "#ffffff"
+      },
+
+      config: {
+        googleMaps: {
+          apiKey: process.env.GOOGLE_MAPS_API_KEY
+        }
+      }
+    },
+
+    web: {
+      favicon: "./assets/favicon.png"
+    },
+
+    extra: {
+      eas: {
+        projectId: "2933bc15-43df-46a4-a1ad-b043ec8f578f"
+      }
+    },
+
+    plugins: [
+      "expo-secure-store",
+      "expo-asset"
+    ]
+  }
+};
