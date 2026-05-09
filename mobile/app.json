@@ -6,8 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "jsEngine": "hermes",
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -15,7 +14,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.voltstartev.mobile"
+      "bundleIdentifier": "com.voltstartev.mobile",
+      "config": {
+        "googleMapsApiKey": "AIzaSyA-VeWWicPO3BSvMhZVtAyAK887S87v0dM"
+      }
     },
     "android": {
       "package": "com.voltstartev.mobile",
@@ -23,27 +25,23 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyA-VeWWicPO3BSvMhZVtAyAK887S87v0dM"
+        }
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": [
-      "expo-build-properties",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/icon.png",
-          "color": "#22d3ee",
-          "sounds": []
-        }
-      ]
-    ],
     "extra": {
       "eas": {
         "projectId": "2933bc15-43df-46a4-a1ad-b043ec8f578f"
       }
-    }
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-asset"
+    ]
   }
 }

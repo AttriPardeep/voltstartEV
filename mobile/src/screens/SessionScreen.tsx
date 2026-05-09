@@ -10,6 +10,9 @@ import { PowerChart } from '../components/PowerChart';
 import * as Haptics from 'expo-haptics';
 import { useSessionStore } from '../store/sessionStore';
 import { useAuthStore } from '../store/authStore';
+import { socket } from '../utils/socket';
+import { useNavigation } from '@react-navigation/native';
+import { AppIcon, IconColors, IconSize } from '../components/icons';
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -50,15 +53,25 @@ interface SessionSummary {
   endSoc?: number;
 }
 
-// ─── Stat Row ─────────────────────────────────────────
+// ─── Stat Row (Updated to use Icon Components) ─────────
 const StatRow = React.memo(({ left, right, theme }: {
-  left: { icon: string; label: string; value: string; color: string };
-  right?: { icon: string; label: string; value: string; color: string };
+  left: { 
+    icon: React.FC<{ size?: number; color?: string }>; 
+    label: string; 
+    value: string; 
+    color: string 
+  };
+  right?: { 
+    icon: React.FC<{ size?: number; color?: string }>; 
+    label: string; 
+    value: string; 
+    color: string 
+  };
   theme: any;
 }) => (
   <View style={[stat.row, { borderBottomColor: theme.border }]}>
     <View style={stat.cell}>
-      <Text style={stat.icon}>{left.icon}</Text>
+      <left.icon size={IconSize.md} color={left.color} />
       <View>
         <Text style={[stat.label, { color: theme.textMuted }]}>{left.label}</Text>
         <Text style={[stat.value, { color: left.color }]}>{left.value}</Text>
@@ -66,7 +79,7 @@ const StatRow = React.memo(({ left, right, theme }: {
     </View>
     {right && (
       <View style={[stat.cell, stat.right, { borderLeftColor: theme.border }]}>
-        <Text style={stat.icon}>{right.icon}</Text>
+        <right.icon size={IconSize.md} color={right.color} />
         <View>
           <Text style={[stat.label, { color: theme.textMuted }]}>{right.label}</Text>
           <Text style={[stat.value, { color: right.color }]}>{right.value}</Text>
@@ -76,7 +89,7 @@ const StatRow = React.memo(({ left, right, theme }: {
   </View>
 ));
 
-// ─── NEW: Charging Efficiency Card ─────────────────────
+// ─── Charging Efficiency Card ──
 function ChargingEfficiencyCard({ summary, user, theme }: { 
   summary: SessionSummary; 
   user: any;
@@ -99,15 +112,21 @@ function ChargingEfficiencyCard({ summary, user, theme }: {
   const lossPercent = actualKwh > 0 
     ? (lossKwh / actualKwh) * 100 : 0;
 
-  // Efficiency rating with color/icon
-  const rating = efficiencyPct >= 95 ? { label: 'Excellent', color: '#22c55e', icon: '🌟' }
-    : efficiencyPct >= 88 ? { label: 'Good', color: '#22d3ee', icon: '✅' }
-    : efficiencyPct >= 80 ? { label: 'Normal', color: '#f59e0b', icon: '⚡' }
-    : { label: 'High Loss', color: '#ef4444', icon: '⚠️' };
+  // Efficiency rating with icon/color 
+  const rating = efficiencyPct >= 95 
+    ? { label: 'Excellent', color: IconColors.success, Icon: AppIcon.Success }
+    : efficiencyPct >= 88 
+      ? { label: 'Good', color: IconColors.primary, Icon: AppIcon.Success }
+      : efficiencyPct >= 80 
+        ? { label: 'Normal', color: IconColors.warning, Icon: AppIcon.Info }
+        : { label: 'High Loss', color: IconColors.error, Icon: AppIcon.Warning };
 
   return (
     <View style={[eff.card, { backgroundColor: theme.card, borderColor: theme.border, borderLeftColor: rating.color }]}>
-      <Text style={[eff.title, { color: theme.text }]}>🔬 Charging Efficiency</Text>
+      <View style={eff.titleRow}>
+        <AppIcon.Gauge size={IconSize.md} color={rating.color} />
+        <Text style={[eff.title, { color: theme.text }]}>Charging Efficiency</Text>
+      </View>
       
       {/* Main efficiency display */}
       <View style={eff.effRow}>
@@ -115,8 +134,9 @@ function ChargingEfficiencyCard({ summary, user, theme }: {
           {efficiencyPct.toFixed(1)}%
         </Text>
         <View style={[eff.badge, { backgroundColor: rating.color + '22' }]}>
+          <rating.Icon size={IconSize.xs} color={rating.color} />
           <Text style={{ color: rating.color, fontSize: 13, fontWeight: '700' }}>
-            {rating.icon} {rating.label}
+            {rating.label}
           </Text>
         </View>
       </View>
@@ -133,25 +153,25 @@ function ChargingEfficiencyCard({ summary, user, theme }: {
       <View style={eff.breakdown}>
         <View style={[eff.breakdownItem, { backgroundColor: theme.bgSecondary }]}>
           <Text style={[eff.breakdownLabel, { color: theme.textMuted }]}>Energy to Battery</Text>
-          <Text style={[eff.breakdownValue, { color: '#22c55e' }]}>
+          <Text style={[eff.breakdownValue, { color: IconColors.success }]}>
             {theoreticalKwh.toFixed(2)} kWh
           </Text>
         </View>
         <View style={[eff.breakdownItem, { backgroundColor: theme.bgSecondary }]}>
           <Text style={[eff.breakdownLabel, { color: theme.textMuted }]}>Lost to Heat</Text>
-          <Text style={[eff.breakdownValue, { color: '#ef4444' }]}>
+          <Text style={[eff.breakdownValue, { color: IconColors.error }]}>
             {lossKwh.toFixed(2)} kWh
           </Text>
         </View>
         <View style={[eff.breakdownItem, { backgroundColor: theme.bgSecondary }]}>
           <Text style={[eff.breakdownLabel, { color: theme.textMuted }]}>Total Delivered</Text>
-          <Text style={[eff.breakdownValue, { color: '#22d3ee' }]}>
+          <Text style={[eff.breakdownValue, { color: IconColors.primary }]}>
             {actualKwh.toFixed(3)} kWh
           </Text>
         </View>
         <View style={[eff.breakdownItem, { backgroundColor: theme.bgSecondary }]}>
           <Text style={[eff.breakdownLabel, { color: theme.textMuted }]}>Heat Loss %</Text>
-          <Text style={[eff.breakdownValue, { color: '#f59e0b' }]}>
+          <Text style={[eff.breakdownValue, { color: IconColors.warning }]}>
             {lossPercent.toFixed(1)}%
           </Text>
         </View>
@@ -161,14 +181,14 @@ function ChargingEfficiencyCard({ summary, user, theme }: {
       <View style={[eff.insight, { backgroundColor: theme.bgSecondary }]}>
         <Text style={[eff.insightText, { color: theme.textSecondary }]}>
           {lossKwh < 0.5
-            ? '✅ Minimal heat loss — battery and charger in great shape.'
+            ? 'Minimal heat loss — battery and charger in great shape.'
             : lossKwh < 2
-            ? `⚡ ${lossKwh.toFixed(1)} kWh lost to heat. Normal for DC fast charging.`
-            : `⚠️ ${lossKwh.toFixed(1)} kWh lost to heat. Consider slower AC charging for better efficiency.`}
+            ? `${lossKwh.toFixed(1)} kWh lost to heat. Normal for DC fast charging.`
+            : `${lossKwh.toFixed(1)} kWh lost to heat. Consider slower AC charging for better efficiency.`}
         </Text>
         {summary.peakPowerKw > 100 && (
           <Text style={[eff.insightText, { color: theme.textSecondary, marginTop: 4 }]}>
-            🌡️ High-power DC charging generates more heat — trade-off for speed.
+            High-power DC charging generates more heat — trade-off for speed.
           </Text>
         )}
       </View>
@@ -239,6 +259,49 @@ export default function SessionScreen() {
       useNativeDriver: false,
     }).start();
   }, [progressPct]);
+  
+  const navigation = useNavigation();
+  
+  // Balance critical alert 
+  useEffect(() => {
+    const handleBalanceCritical = (event: any) => {
+      const payload = event?.data || {};
+      const balance = Number(payload.currentBalance ?? 0);
+      const cost = Number(payload.costSoFar ?? 0);
+      Alert.alert(
+        'Wallet Balance Critical',
+        `Your balance is ₹${balance.toFixed(2)}.\n\nYour charging session is being stopped automatically.\n\nCost so far: ₹${cost.toFixed(2)}`,
+        [
+          {
+            text: 'Add Money',
+            onPress: () => navigation.navigate('Wallet'),
+          },
+          { text: 'OK' },
+        ]
+      );
+    };
+    socket.on('balance_critical', handleBalanceCritical);
+    return () => {
+      socket.off('balance_critical', handleBalanceCritical);
+    };
+  }, [navigation]);
+
+  // SOC target reached alert 
+  useEffect(() => {
+    const handleSocTargetReached = (data: any) => {
+      const vehicleName = data?.vehicle || 'vehicle';
+      const targetSoc = data?.targetSoc ?? data?.currentSoc ?? '--';
+      
+      Alert.alert(
+        'Target Charge Reached',
+        `Your ${vehicleName} has reached ${targetSoc}% charge.\n\nCharging stopped.`,
+        [{ text: 'OK', onPress: () => navigation.navigate('Home') }]
+      );
+    };
+    
+    socket.on('soc_target_reached', handleSocTargetReached);
+    return () => socket.off('soc_target_reached', handleSocTargetReached);
+  }, [navigation]);
 
   const progressWidth = progressAnim.interpolate({
     inputRange: [0, 100],
@@ -256,7 +319,7 @@ export default function SessionScreen() {
     return isFinite(r) && r > 0 ? Math.round(r) : null;
   }, [batteryKwh, currentSoc, powerKw, targetSoc]);
 
-  // Stop confirmation
+  // Stop confirmation 
   const handleStop = useCallback(() => {
     if (!activeSession) return;
     const energy = telemetry?.energyKwh ?? 0;
@@ -264,10 +327,10 @@ export default function SessionScreen() {
 
     Alert.alert(
       'Stop Charging?',
-      `⏱  ${formatTime(elapsed)}\n` +
-      `⚡  ${fmt(energy, 3)} kWh delivered\n` +
-      `💰  ₹${fmt(cost, 2)} charged\n` +
-      `🔋  SOC: ${currentSoc ?? '—'}%`,
+      `${formatTime(elapsed)}\n` +
+      `${fmt(energy, 3)} kWh delivered\n` +
+      `₹${fmt(cost, 2)} charged\n` +
+      `SOC: ${currentSoc ?? '—'}%`,
       [
         { text: 'Continue Charging', style: 'cancel' },
         {
@@ -305,14 +368,17 @@ export default function SessionScreen() {
   if (!activeSession) {
     return (
       <View style={[styles.empty, { backgroundColor: theme.bg }]}>
-        <Text style={styles.emptyIcon}>🔌</Text>
+        <View style={styles.emptyIcon}>
+          <AppIcon.Plug size={IconSize.xl} color={IconColors.muted} />
+        </View>
         <Text style={[styles.emptyTitle, { color: theme.text }]}>No Active Session</Text>
         <Text style={[styles.emptySub, { color: theme.textMuted }]}>Go to the Map tab to start charging</Text>
         <TouchableOpacity 
           style={[styles.refreshBtn, { backgroundColor: theme.card }]}
           onPress={fetchActiveSession}
         >
-          <Text style={[styles.refreshText, { color: theme.accent }]}>↻  Refresh</Text>
+          <AppIcon.Refresh size={IconSize.sm} color={theme.accent} />
+          <Text style={[styles.refreshText, { color: theme.accent, marginLeft: 4 }]}>Refresh</Text>
         </TouchableOpacity>
       </View>
     );
@@ -349,9 +415,11 @@ export default function SessionScreen() {
               style={[styles.outdoorBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
               onPress={toggleOutdoorMode}
             >
-              <Text style={styles.outdoorBtnText}>
-                {outdoorMode ? '☀️' : '🌙'}
-              </Text>
+              {outdoorMode ? (
+                <AppIcon.Gauge size={IconSize.md} color={IconColors.warning} />
+              ) : (
+                <AppIcon.Battery size={IconSize.md} color={IconColors.muted} />
+              )}
             </TouchableOpacity>
           </View>
 
@@ -360,9 +428,12 @@ export default function SessionScreen() {
           </Text>
 
           {isStale && (
-            <Text style={[styles.staleText, { color: theme.warning }]}>
-              📡 Last update {secondsSinceUpdate}s ago
-            </Text>
+            <View style={styles.staleRow}>
+              <AppIcon.WifiOff size={IconSize.xs} color={IconColors.warning} />
+              <Text style={[styles.staleText, { color: IconColors.warning }]}>
+                Last update {secondsSinceUpdate}s ago
+              </Text>
+            </View>
           )}
 
           {/* Progress + Est Time */}
@@ -372,11 +443,14 @@ export default function SessionScreen() {
                 {currentSoc != null ? `${currentSoc}%  →  ${targetSoc}%` : `Target: ${targetSoc}%`}
               </Text>
               {estimatedMinutes != null && (
-                <Text style={[styles.estTime, { color: theme.accentBright }]}>
-                  ⏱ {estimatedMinutes > 60
-                    ? `${Math.floor(estimatedMinutes / 60)}h ${estimatedMinutes % 60}m`
-                    : `${estimatedMinutes} min`} left
-                </Text>
+                <View style={styles.estTimeRow}>
+                  <AppIcon.Clock size={IconSize.xs} color={theme.accentBright} />
+                  <Text style={[styles.estTime, { color: theme.accentBright }]}>
+                    {estimatedMinutes > 60
+                      ? `${Math.floor(estimatedMinutes / 60)}h ${estimatedMinutes % 60}m`
+                      : `${estimatedMinutes} min`} left
+                  </Text>
+                </View>
               )}
             </View>
             <View style={[styles.progressBg, { backgroundColor: theme.border }]}>
@@ -385,22 +459,52 @@ export default function SessionScreen() {
           </View>
         </View>
 
-        {/* Stat Rows */}
+        {/* Stat Rows (using icon components) */}
         <View style={[styles.statsCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <StatRow
             theme={theme}
-            left={{ icon: '⚡', label: 'Power', value: `${fmt(powerKw)} kW`, color: theme.power }}
-            right={{ icon: '🔋', label: 'Energy', value: `${fmt(telemetry?.energyKwh, 3)} kWh`, color: theme.energy }}
+            left={{ 
+              icon: AppIcon.Zap, 
+              label: 'Power', 
+              value: `${fmt(powerKw)} kW`, 
+              color: theme.power 
+            }}
+            right={{ 
+              icon: AppIcon.BatteryCharging, 
+              label: 'Energy', 
+              value: `${fmt(telemetry?.energyKwh, 3)} kWh`, 
+              color: theme.energy 
+            }}
           />
           <StatRow
             theme={theme}
-            left={{ icon: '💰', label: 'Cost So Far', value: `₹${fmt(telemetry?.costSoFar)}`, color: theme.cost }}
-            right={{ icon: '🔋', label: 'Battery SOC', value: currentSoc != null ? `${currentSoc}%` : '—', color: theme.soc }}
+            left={{ 
+              icon: AppIcon.Rupee, 
+              label: 'Cost So Far', 
+              value: `₹${fmt(telemetry?.costSoFar)}`, 
+              color: theme.cost 
+            }}
+            right={{ 
+              icon: AppIcon.Battery, 
+              label: 'Battery SOC', 
+              value: currentSoc != null ? `${currentSoc}%` : '—', 
+              color: theme.soc 
+            }}
           />
           <StatRow
             theme={theme}
-            left={{ icon: '🔌', label: 'Voltage', value: `${fmt(telemetry?.voltageV, 0)} V`, color: theme.voltage }}
-            right={{ icon: '⚡', label: 'Current', value: `${fmt(telemetry?.currentA, 1)} A`, color: theme.current }}
+            left={{ 
+              icon: AppIcon.Gauge, 
+              label: 'Voltage', 
+              value: `${fmt(telemetry?.voltageV, 0)} V`, 
+              color: theme.voltage 
+            }}
+            right={{ 
+              icon: AppIcon.Activity, 
+              label: 'Current', 
+              value: `${fmt(telemetry?.currentA, 1)} A`, 
+              color: theme.current 
+            }}
           />
         </View>
 
@@ -408,7 +512,7 @@ export default function SessionScreen() {
         <PowerChart data={powerHistory} />
       </ScrollView>
 
-      {/* Stop Button */}
+      {/* Stop Button (no emojis) */}
       <View style={[styles.stopWrap, { backgroundColor: theme.bg }]}>
         <TouchableOpacity
           style={[styles.stopBtn, { backgroundColor: theme.error, shadowColor: theme.error }]}
@@ -421,7 +525,7 @@ export default function SessionScreen() {
           {isLoading
             ? <ActivityIndicator color={theme.textInverse} size="large" />
             : <>
-                <Text style={styles.stopIcon}>⏹</Text>
+                <AppIcon.Power size={IconSize.md} color={theme.textInverse} />
                 <Text style={[styles.stopText, { color: theme.textInverse }]}>Stop Charging</Text>
               </>
           }
@@ -431,24 +535,25 @@ export default function SessionScreen() {
   );
 }
 
-// ─── Summary Screen (with Efficiency Card) ─────────────
+// ─── Summary Screen (with Efficiency Card, no emojis) ──
 function SummaryScreen({ summary, onDismiss, theme, user }:
   { summary: SessionSummary; onDismiss: () => void; theme: any; user: any }) {
   const costPerKwh = summary.energyKwh > 0 ? (summary.costTotal / summary.energyKwh).toFixed(2) : '—';
   const co2 = (summary.energyKwh * 0.82).toFixed(2);
   const km = (summary.energyKwh * 6).toFixed(0);
 
+  // 
   const tips: string[] = [];
   if (summary.peakPowerKw > 100)
-    tips.push('⚡ DC fast charging used — ideal for highway stops.');
+    tips.push('DC fast charging used — ideal for highway stops.');
   if (summary.endSoc && summary.endSoc >= 80)
-    tips.push('🔋 Charging to 80% preserves long-term battery health.');
+    tips.push('Charging to 80% preserves long-term battery health.');
   if (summary.duration < 300)
-    tips.push('⏱ Short session — off-peak hours often have better rates.');
+    tips.push('Short session — off-peak hours often have better rates.');
   if (summary.energyKwh > 20)
-    tips.push('🌱 Great charge! Significant CO₂ emissions offset today.');
+    tips.push('Great charge! Significant CO₂ emissions offset today.');
   if (!tips.length)
-    tips.push('✅ Your EV is charged and ready to go!');
+    tips.push('Your EV is charged and ready to go!');
 
   return (
     <ScrollView 
@@ -456,16 +561,39 @@ function SummaryScreen({ summary, onDismiss, theme, user }:
       contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 }]}
     >
       <View style={styles.header}>
-        <Text style={styles.check}>✅</Text>
+        <View style={styles.checkIcon}>
+          <AppIcon.Success size={IconSize.xxl} color={IconColors.success} />
+        </View>
         <Text style={[styles.title, { color: theme.text }]}>Session Complete</Text>
         <Text style={[styles.sub, { color: theme.textMuted }]}>{summary.chargeBoxId}</Text>
         <Text style={[styles.dur, { color: theme.textMuted }]}>{formatDuration(summary.duration)}</Text>
       </View>
 
       <View style={styles.bigRow}>
-        <BigStat label="Energy" value={`${summary.energyKwh.toFixed(3)}`} unit="kWh" color={theme.energy} theme={theme} />
-        <BigStat label="Total Cost" value={`₹${summary.costTotal.toFixed(2)}`} unit="" color={theme.cost} theme={theme} />
-        <BigStat label="Peak Power" value={`${summary.peakPowerKw.toFixed(1)}`} unit="kW" color={theme.power} theme={theme} />
+        <BigStat 
+          label="Energy" 
+          value={`${summary.energyKwh.toFixed(3)}`} 
+          unit="kWh" 
+          color={theme.energy} 
+          theme={theme} 
+          Icon={AppIcon.BatteryCharging}
+        />
+        <BigStat 
+          label="Total Cost" 
+          value={`₹${summary.costTotal.toFixed(2)}`} 
+          unit="" 
+          color={theme.cost} 
+          theme={theme}
+          Icon={AppIcon.Rupee}
+        />
+        <BigStat 
+          label="Peak Power" 
+          value={`${summary.peakPowerKw.toFixed(1)}`} 
+          unit="kW" 
+          color={theme.power} 
+          theme={theme}
+          Icon={AppIcon.Zap}
+        />
       </View>
 
       <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
@@ -478,11 +606,14 @@ function SummaryScreen({ summary, onDismiss, theme, user }:
         <SummRow label="Duration" value={formatDuration(summary.duration)} theme={theme} />
       </View>
 
-      {/* ✅ NEW: Charging Efficiency Card */}
+      {/* Charging Efficiency Card */}
       <ChargingEfficiencyCard summary={summary} user={user} theme={theme} />
 
       <View style={[styles.tipsCard, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
-        <Text style={[styles.tipsTitle, { color: theme.accentBright }]}>💡 Smart Tips</Text>
+        <View style={styles.tipsTitleRow}>
+          <AppIcon.Info size={IconSize.md} color={theme.accentBright} />
+          <Text style={[styles.tipsTitle, { color: theme.accentBright }]}>Smart Tips</Text>
+        </View>
         {tips.map((t, i) => (
           <Text key={i} style={[styles.tipLine, { color: theme.textSecondary }]}>{t}</Text>
         ))}
@@ -498,10 +629,12 @@ function SummaryScreen({ summary, onDismiss, theme, user }:
   );
 }
 
-function BigStat({ label, value, unit, color, theme }:
-  { label: string; value: string; unit: string; color: string; theme: any }) {
+// ─── BigStat (with icon prop) ─────────────────────────
+function BigStat({ label, value, unit, color, theme, Icon }:
+  { label: string; value: string; unit: string; color: string; theme: any; Icon: React.FC<{ size?: number; color?: string }> }) {
   return (
     <View style={[summ.bigStat, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <Icon size={IconSize.lg} color={color} />
       <Text style={[summ.bigVal, { color }]}>{value}</Text>
       {unit ? <Text style={[summ.bigUnit, { color: theme.textMuted }]}>{unit}</Text> : null}
       <Text style={[summ.bigLabel, { color: theme.textMuted }]}>{label}</Text>
@@ -524,23 +657,24 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 8 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyIcon: { fontSize: 64, marginBottom: 16 },
+  emptyIcon: { marginBottom: 16, alignItems: 'center', justifyContent: 'center' },
   emptyTitle: { fontSize: 22, fontWeight: '700', marginBottom: 8 },
   emptySub: { fontSize: 15, marginBottom: 24 },
-  refreshBtn: { borderRadius: 10, paddingHorizontal: 28, paddingVertical: 12 },
+  refreshBtn: { borderRadius: 10, paddingHorizontal: 28, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   refreshText: { fontWeight: '600', fontSize: 15 },
   header: { marginBottom: 14 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   badge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
   dot: { width: 7, height: 7, borderRadius: 3.5 },
   badgeText: { fontWeight: '700', fontSize: 11, letterSpacing: 1 },
-  outdoorBtn: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1 },
-  outdoorBtnText: { fontSize: 16 },
+  outdoorBtn: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   timer: { fontSize: 58, fontWeight: '800', textAlign: 'center', letterSpacing: 3, marginBottom: 4 },
-  staleText: { fontSize: 11, textAlign: 'center', marginBottom: 8 },
+  staleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginBottom: 8 },
+  staleText: { fontSize: 11, textAlign: 'center' },
   progressCard: { borderRadius: 14, padding: 14, borderWidth: 1 },
   progressHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
   progressLabel: { fontSize: 13 },
+  estTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   estTime: { fontSize: 13, fontWeight: '700' },
   progressBg: { height: 12, borderRadius: 6, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 6 },
@@ -548,16 +682,16 @@ const styles = StyleSheet.create({
   card: { borderRadius: 14, padding: 16, marginBottom: 14, borderWidth: 1 },
   bigRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
   tipsCard: { borderRadius: 14, padding: 16, marginBottom: 20, borderWidth: 1 },
-  tipsTitle: { fontSize: 14, fontWeight: '700', marginBottom: 10 },
+  tipsTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  tipsTitle: { fontSize: 14, fontWeight: '700' },
   tipLine: { fontSize: 13, marginBottom: 7, lineHeight: 20 },
   doneBtn: { borderRadius: 14, padding: 17, alignItems: 'center' },
   doneTxt: { fontWeight: '800', fontSize: 16 },
   stopWrap: { padding: 16, paddingBottom: 28 },
   stopBtn: { borderRadius: 16, paddingVertical: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8 },
-  stopIcon: { fontSize: 20 },
   stopText: { fontWeight: '800', fontSize: 18 },
   header: { alignItems: 'center', paddingVertical: 28 },
-  check: { fontSize: 60, marginBottom: 8 },
+  checkIcon: { marginBottom: 8, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 28, fontWeight: '800', marginBottom: 4 },
   sub: { fontSize: 13, marginBottom: 4 },
   dur: { fontSize: 13 },
@@ -567,13 +701,12 @@ const stat = StyleSheet.create({
   row: { flexDirection: 'row', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1 },
   cell: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   right: { borderLeftWidth: 1, paddingLeft: 16 },
-  icon: { fontSize: 22 },
   label: { fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
   value: { fontSize: 18, fontWeight: '800', marginTop: 1 },
 });
 
 const summ = StyleSheet.create({
-  bigStat: { flex: 1, borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1 },
+  bigStat: { flex: 1, borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1, gap: 6 },
   bigVal: { fontSize: 20, fontWeight: '800' },
   bigUnit: { fontSize: 11 },
   bigLabel: { fontSize: 10, textTransform: 'uppercase', marginTop: 4, textAlign: 'center' },
@@ -589,11 +722,17 @@ const eff = StyleSheet.create({
     padding: 16, marginBottom: 14,
     borderLeftWidth: 3,
   },
-  title: { fontSize: 15, fontWeight: '700', marginBottom: 12 },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  title: { fontSize: 15, fontWeight: '700' },
   effRow: { flexDirection: 'row', alignItems: 'center',
     justifyContent: 'space-between', marginBottom: 8 },
   effPct: { fontSize: 36, fontWeight: '800' },
-  badge: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
+  badge: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, flexDirection: 'row', alignItems: 'center', gap: 4 },
   progressBg: { height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 16 },
   progressFill: { height: '100%', borderRadius: 4 },
   breakdown: { flexDirection: 'row', flexWrap: 'wrap',

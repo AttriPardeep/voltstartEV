@@ -78,10 +78,17 @@ export const useAuthStore = create<AuthState>((set) => ({
   // LOGIN — map API response including idTag
   login: async (username, password) => {
     set({ isLoading: true });
+console.log('🔐 Login attempt:', { username });
     try {
       const res = await api.post('/api/users/login', { username, password });
       const { token, user: apiUser } = res.data.data;
-
+// ✅ LOG: What API returned
+console.log('📥 Login API response:', {
+      userId: apiUser.userId,
+      username: apiUser.username,
+      idTag: apiUser.idTag,
+      hasToken: !!token
+    });
       //  Map API response to our User interface
       const userData: User = {
         userId: apiUser.userId,
@@ -106,6 +113,12 @@ export const useAuthStore = create<AuthState>((set) => ({
         createdAt: apiUser.createdAt,
         updatedAt: apiUser.updatedAt,
       };
+// ✅ LOG: What we're storing
+console.log('💾 Storing user in auth store:', {
+      userId: userData.userId,
+      username: userData.username,
+      idTag: userData.idTag
+    });
 
       // Persist to AsyncStorage
       await Promise.all([
@@ -113,6 +126,12 @@ export const useAuthStore = create<AuthState>((set) => ({
         AsyncStorage.setItem('auth_user', JSON.stringify(userData)),
       ]);
 
+// ✅ LOG: Verify storage
+const storedUser = await AsyncStorage.getItem('auth_user');
+    console.log('✅ User stored in AsyncStorage:', 
+      storedUser ? JSON.parse(storedUser).idTag : 'NULL'
+    );
+	
       set({ token, user: userData, isLoading: false });
     } catch (err) {
       set({ isLoading: false });

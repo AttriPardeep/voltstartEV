@@ -5,6 +5,9 @@ import {
   Alert, ActivityIndicator, Modal, TextInput, ScrollView
 } from 'react-native';
 import { api } from '../utils/api';
+import { useAuthStore } from '../store/authStore';
+import { AppIcon, IconColors } from '../components/icons';
+import { TagTypeBadge } from '../components/TagTypeBadge';
 
 interface RFIDCard {
   id: number;
@@ -21,15 +24,17 @@ const refreshUserTag = async () => {
   try {
     const res = await api.get('/api/users/me/rfid');
     const cards: RFIDCard[] = res.data.data || [];
-    // Find the primary active card
-    const primary = cards.find(c => c.is_primary === 1 && c.is_active === 1)
-                 || cards.find(c => c.tag_type === 'system' && c.is_active === 1);
+
+    // Find primary active card
+    const primary =
+      cards.find(c => c.is_primary === 1 && c.is_active === 1)
+      || cards.find(c => c.tag_type === 'system' && c.is_active === 1);
 
     if (primary) {
-      // Update authStore so Profile header shows correct tag
       useAuthStore.getState().updateUser({
-        idTag: primary.ocpp_tag_id
+        idTag: primary.id_tag
       });
+      console.log(' Updated auth store idTag:', primary.id_tag);
     }
   } catch (err) {
     console.warn('Could not refresh user tag:', err);
@@ -58,12 +63,12 @@ function AddRFIDModal({ visible, onClose, onAdded }: {
         label: label.trim() || 'My RFID Card',
       });
       Alert.alert(
-        '✅ RFID Card Registered',
+        'RFID Card Registered',
         `${res.data.data.idTag}\n\nYou can now tap this card at any VoltStartEV charger.`
       );
       setIdTag(''); setLabel('');
       onAdded();
-	  await refreshUserTag();
+      await refreshUserTag();
       onClose();
     } catch (err: any) {
       Alert.alert('Failed', err?.response?.data?.error || 'Could not register card');
@@ -78,16 +83,23 @@ function AddRFIDModal({ visible, onClose, onAdded }: {
       <View style={m.overlay}>
         <View style={m.sheet}>
           <View style={m.header}>
-            <Text style={m.title}>Add RFID Card</Text>
+            {/* Header: Icon + Text in row */}
+            <View style={m.titleRow}>
+              <AppIcon.Card size={20} color={IconColors.primary} />
+              <Text style={m.title}>Add RFID Card</Text>
+            </View>
             <TouchableOpacity onPress={onClose}>
-              <Text style={m.close}>✕</Text>
+              <AppIcon.Close size={22} color={IconColors.muted} />
             </TouchableOpacity>
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false}>
             {/* Instruction */}
             <View style={m.infoBox}>
-              <Text style={m.infoTitle}>📖 Where to find your RFID ID</Text>
+              <View style={m.infoTitleRow}>
+                <AppIcon.Info size={14} color="#60a5fa" />
+                <Text style={m.infoTitle}>Where to find your RFID ID</Text>
+              </View>
               <Text style={m.infoText}>
                 Look for the UID printed on the back of your RFID card or fob.
                 It's usually 8 characters like{' '}
@@ -117,21 +129,6 @@ function AddRFIDModal({ visible, onClose, onAdded }: {
               placeholder="e.g. My Blue Fob, Work Card"
               placeholderTextColor="#475569"
             />
-
-            {/* Common RFID types info */}
-            <View style={m.typesRow}>
-              {[
-                { icon: '💳', name: 'RFID Card', freq: '13.56 MHz' },
-                { icon: '🔑', name: 'Key Fob',   freq: '13.56 MHz' },
-                { icon: '📱', name: 'NFC Tag',   freq: '13.56 MHz' },
-              ].map(t => (
-                <View key={t.name} style={m.typeCard}>
-                  <Text style={m.typeIcon}>{t.icon}</Text>
-                  <Text style={m.typeName}>{t.name}</Text>
-                  <Text style={m.typeFreq}>{t.freq}</Text>
-                </View>
-              ))}
-            </View>
 
             <TouchableOpacity
               style={[m.saveBtn, saving && m.saveBtnDim]}
@@ -171,8 +168,8 @@ export default function RFIDSection() {
   const handleSetPrimary = async (card: RFIDCard) => {
     try {
       await api.put(`/api/users/me/rfid/${card.id}/primary`);
-      fetchCards();
-	  await refreshUserTag();
+      await fetchCards();
+      await refreshUserTag();
     } catch (err: any) {
       Alert.alert('Failed', err?.response?.data?.error || 'Could not update');
     }
@@ -197,8 +194,7 @@ export default function RFIDSection() {
             try {
               await api.delete(`/api/users/me/rfid/${card.id}`);
               fetchCards();
-			  onTagChanged?.();
-			  await refreshUserTag();
+              await refreshUserTag();
             } catch (err: any) {
               Alert.alert('Failed', err?.response?.data?.error || 'Could not remove');
             }
@@ -207,37 +203,30 @@ export default function RFIDSection() {
       ]
     );
   };
-
-  const tagTypeLabel = (type: string) => {
-    switch (type) {
-      case 'system':        return '⚡ App Tag';
-      case 'external_rfid': return '💳 RFID Card';
-      case 'fleet':         return '🏢 Fleet Tag';
-      default:              return type;
-    }
-  };
-
   return (
     <View style={s.container}>
+      {/* Header */}
       <View style={s.header}>
-        <Text style={s.title}>💳 RFID & Charging Tags</Text>
-        <TouchableOpacity style={s.addBtn}
-          onPress={() => setShowAdd(true)}>
+        <View style={s.titleRow}>
+          <AppIcon.Card size={20} color={IconColors.primary} />
+          <Text style={s.title}>RFID & Charging Tags</Text>
+        </View>
+        <TouchableOpacity style={s.addBtn} onPress={() => setShowAdd(true)}>
           <Text style={s.addBtnText}>+ Add RFID</Text>
         </TouchableOpacity>
       </View>
 
       <Text style={s.subtitle}>
-        Tap your RFID card at any charger to start charging
-        without opening the app.
+        Tap your RFID card at any charger to start charging without opening the app.
       </Text>
 
       {loading ? (
-        <ActivityIndicator color="#22d3ee" style={{ margin: 16 }} />
+        <ActivityIndicator color={IconColors.primary} style={{ margin: 16 }} />
       ) : cards.length === 0 ? (
-        <TouchableOpacity style={s.emptyCard}
-          onPress={() => setShowAdd(true)}>
-          <Text style={s.emptyIcon}>💳</Text>
+        <TouchableOpacity style={s.emptyCard} onPress={() => setShowAdd(true)}>
+          <View style={s.emptyIcon}>
+            <AppIcon.Card size={36} color={IconColors.muted} />
+          </View>
           <Text style={s.emptyTitle}>No cards registered</Text>
           <Text style={s.emptySub}>
             Add your RFID card or fob to charge without the app
@@ -245,59 +234,68 @@ export default function RFIDSection() {
         </TouchableOpacity>
       ) : (
         cards.map(card => (
-          <View key={card.id} style={[
-            s.card,
-            card.is_primary === 1 && s.cardPrimary,
-            card.blocked === 1 && s.cardBlocked,
-          ]}>
-            {/* Primary badge */}
+          <View 
+            key={card.id} 
+            style={[
+              s.card,
+              card.is_primary === 1 && s.cardPrimary,
+              card.blocked === 1 && s.cardBlocked,
+            ]}
+          >
+            {/* ONLY show badge */}
             {card.is_primary === 1 && (
               <View style={s.primaryBadge}>
-                <Text style={s.primaryBadgeText}>⭐ Primary</Text>
+                <View style={s.badgeContent}>
+                  <AppIcon.Success
+                    size={12}
+                    color={IconColors.primary}
+                    strokeWidth={2.5}
+                  />
+                  <Text style={s.primaryBadgeText}>Primary</Text>
+                </View>
               </View>
             )}
-
+            
+            {/* Blocked Badge - Top Left */}
             {card.blocked === 1 && (
               <View style={s.blockedBadge}>
-                <Text style={s.blockedBadgeText}>⛔ Blocked</Text>
+                <View style={s.badgeContent}>
+                  <AppIcon.Error size={12} color={IconColors.error} strokeWidth={2.5} />
+                  <Text style={s.blockedBadgeText}>Blocked</Text>
+                </View>
               </View>
             )}
 
+            {/* Card Header - Tag Type Badge on Right */}
             <View style={s.cardHeader}>
               <View style={{ flex: 1 }}>
-                <Text style={s.cardLabel}>{card.label}</Text>
+                {/* Tag ID - Large & Prominent */}
                 <Text style={s.cardTag}>{card.id_tag}</Text>
+                {/* Label - Smaller, below tag */}
+                {card.label && (
+                  <Text style={s.cardLabel}>{card.label}</Text>
+                )}
               </View>
-              <View style={[s.typePill,
-                { backgroundColor: card.tag_type === 'system'
-                    ? '#0c4a6e' : '#1a2a1a' }]}>
-                <Text style={[s.typePillText,
-                  { color: card.tag_type === 'system'
-                      ? '#22d3ee' : '#22c55e' }]}>
-                  {tagTypeLabel(card.tag_type)}
-                </Text>
-              </View>
+              
+              {/* Tag Type Badge - Top Right */}
+              <TagTypeBadge type={card.tag_type} />
             </View>
 
+            {/* Date - Below tag info */}
             <Text style={s.cardDate}>
               Added {new Date(card.created_at).toLocaleDateString('en-IN')}
             </Text>
 
-            {/* Actions */}
+            {/* Actions Row */}
             <View style={s.actions}>
-              {card.is_primary !== 1 && (
-                <TouchableOpacity style={s.actionBtn}
-                  onPress={() => handleSetPrimary(card)}>
-                  <Text style={s.actionBtnText}>Set Primary</Text>
-                </TouchableOpacity>
-              )}
               {card.tag_type !== 'system' && (
                 <TouchableOpacity
                   style={[s.actionBtn, s.actionBtnDanger]}
-                  onPress={() => handleRemove(card)}>
+                  onPress={() => handleRemove(card)}
+                >
                   <Text style={s.actionBtnDangerText}>Remove</Text>
                 </TouchableOpacity>
-              )}
+              )}			
             </View>
           </View>
         ))
@@ -312,119 +310,294 @@ export default function RFIDSection() {
   );
 }
 
+// ── Styles ────────────────────────────────────────────
 const s = StyleSheet.create({
-  container:   { marginBottom: 16 },
+  container: { 
+    marginBottom: 16,
+  },
+  // Header
   header: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 6,
+    flexDirection: 'row', 
+    justifyContent: 'space-between',
+    alignItems: 'center', 
+    marginBottom: 6,
   },
-  title:    { color: '#f1f5f9', fontSize: 17, fontWeight: '700' },
-  subtitle: { color: '#64748b', fontSize: 12, marginBottom: 14, lineHeight: 18 },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  title: { 
+    color: '#f1f5f9', 
+    fontSize: 17, 
+    fontWeight: '700',
+    includeFontPadding: false,
+  },
+  
+  subtitle: { 
+    color: IconColors.muted, 
+    fontSize: 12, 
+    marginBottom: 14, 
+    lineHeight: 18,
+    includeFontPadding: false,
+  },
+  
+  // Add Button
   addBtn: {
-    backgroundColor: '#22d3ee', borderRadius: 20,
-    paddingHorizontal: 14, paddingVertical: 6,
+    backgroundColor: IconColors.primary, 
+    borderRadius: 20,
+    paddingHorizontal: 14, 
+    paddingVertical: 6,
   },
-  addBtnText: { color: '#0f172a', fontWeight: '700', fontSize: 13 },
+  addBtnText: { 
+    color: '#0f172a', 
+    fontWeight: '700', 
+    fontSize: 13,
+    includeFontPadding: false,
+  },
+  
+  // Empty State
   emptyCard: {
-    backgroundColor: '#1e293b', borderRadius: 12,
-    padding: 24, alignItems: 'center',
-    borderWidth: 1, borderColor: '#334155', borderStyle: 'dashed',
+    backgroundColor: '#1e293b', 
+    borderRadius: 12,
+    padding: 24, 
+    alignItems: 'center',
+    borderWidth: 1, 
+    borderColor: '#334155', 
+    borderStyle: 'dashed',
   },
-  emptyIcon:  { fontSize: 36, marginBottom: 8 },
-  emptyTitle: { color: '#e2e8f0', fontSize: 15, fontWeight: '600',
-    marginBottom: 4 },
-  emptySub:   { color: '#64748b', fontSize: 13, textAlign: 'center' },
+  emptyIcon: {
+    marginBottom: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyTitle: { 
+    color: '#e2e8f0', 
+    fontSize: 15, 
+    fontWeight: '600',
+    marginBottom: 4,
+    includeFontPadding: false,
+  },
+  emptySub: { 
+    color: IconColors.muted, 
+    fontSize: 13, 
+    textAlign: 'center',
+    includeFontPadding: false,
+  },
+  
+  // Card Container
   card: {
-    backgroundColor: '#1e293b', borderRadius: 12,
-    padding: 14, marginBottom: 10,
-    borderWidth: 1, borderColor: '#334155',
+    backgroundColor: '#1e293b', 
+    borderRadius: 12,
+    padding: 14, 
+    marginBottom: 10,
+    borderWidth: 1, 
+    borderColor: '#334155',
   },
-  cardPrimary: { borderColor: '#22d3ee' },
-  cardBlocked: { borderColor: '#ef4444', opacity: 0.7 },
+  cardPrimary: { 
+    borderColor: IconColors.primary,
+    borderWidth: 1.5,
+  },
+  cardBlocked: { 
+    borderColor: IconColors.error, 
+    opacity: 0.7,
+  },
+  
+  // Badges (Primary/Blocked)
   primaryBadge: {
-    backgroundColor: '#0c4a6e', borderRadius: 20,
-    paddingHorizontal: 10, paddingVertical: 3,
-    alignSelf: 'flex-start', marginBottom: 8,
+    backgroundColor: '#0c4a6e', 
+    borderRadius: 20,
+    paddingHorizontal: 10, 
+    paddingVertical: 4,
+    alignSelf: 'flex-start', 
+    marginBottom: 10,
   },
-  primaryBadgeText: { color: '#22d3ee', fontSize: 11, fontWeight: '700' },
   blockedBadge: {
-    backgroundColor: '#7f1d1d', borderRadius: 20,
-    paddingHorizontal: 10, paddingVertical: 3,
-    alignSelf: 'flex-start', marginBottom: 8,
+    backgroundColor: '#7f1d1d', 
+    borderRadius: 20,
+    paddingHorizontal: 10, 
+    paddingVertical: 4,
+    alignSelf: 'flex-start', 
+    marginBottom: 10,
   },
-  blockedBadgeText: { color: '#fca5a5', fontSize: 11, fontWeight: '700' },
-  cardHeader: { flexDirection: 'row', alignItems: 'flex-start',
-    marginBottom: 4 },
-  cardLabel:  { color: '#f1f5f9', fontSize: 15, fontWeight: '700' },
-  cardTag:    { color: '#22d3ee', fontSize: 12, fontFamily: 'monospace',
-    marginTop: 2 },
-  typePill: {
-    borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4,
-    marginLeft: 8,
+  badgeContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
-  typePillText: { fontSize: 11, fontWeight: '700' },
-  cardDate:   { color: '#475569', fontSize: 11, marginBottom: 10 },
-  actions:    { flexDirection: 'row', gap: 8 },
+  primaryBadgeText: { 
+    color: IconColors.primary, 
+    fontSize: 11, 
+    fontWeight: '700',
+    includeFontPadding: false,
+  },
+  blockedBadgeText: { 
+    color: '#fca5a5', 
+    fontSize: 11, 
+    fontWeight: '700',
+    includeFontPadding: false,
+  },
+  
+  // Card Content
+  cardHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'flex-start',
+    marginBottom: 6,
+  },
+  cardTag: {
+    color: IconColors.font, 
+    fontSize: 14,  // Larger, more prominent
+    fontWeight: '700',
+    fontFamily: 'monospace',
+    includeFontPadding: false,
+    marginBottom: 2,
+  },
+  cardLabel: {  
+    color: '#94a3b8', 
+    fontSize: 13, 
+    includeFontPadding: false,
+  },
+  
+  cardDate: {   
+    color: '#475569', 
+    fontSize: 11, 
+    marginBottom: 12,
+    includeFontPadding: false,
+  },
+  
+  // Action Buttons
+  actions: {    
+    flexDirection: 'row', 
+    gap: 8,
+  },
   actionBtn: {
-    backgroundColor: '#0f172a', borderRadius: 8,
-    paddingHorizontal: 12, paddingVertical: 6,
-    borderWidth: 1, borderColor: '#334155',
+    backgroundColor: '#0f172a', 
+    borderRadius: 8,
+    paddingHorizontal: 12, 
+    paddingVertical: 8,  // Slightly taller
+    borderWidth: 1, 
+    borderColor: '#334155',
   },
-  actionBtnText:       { color: '#94a3b8', fontSize: 12 },
-  actionBtnDanger:     { borderColor: '#7f1d1d' },
-  actionBtnDangerText: { color: '#fca5a5', fontSize: 12 },
+  actionBtnText: {       
+    color: '#94a3b8', 
+    fontSize: 12,
+    fontWeight: '600',
+    includeFontPadding: false,
+  },
+  actionBtnDanger: {     
+    borderColor: '#7f1d1d',
+  },
+  actionBtnDangerText: { 
+    color: '#fca5a5', 
+    fontSize: 12,
+    fontWeight: '600',
+    includeFontPadding: false,
+  },
 });
 
 const m = StyleSheet.create({
   overlay: {
-    flex: 1, backgroundColor: '#00000088', justifyContent: 'flex-end',
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.6)',  // Slightly darker
+    justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: '#1e293b', borderTopLeftRadius: 24,
-    borderTopRightRadius: 24, padding: 24, paddingBottom: 40,
+    backgroundColor: '#1e293b', 
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24, 
+    padding: 24, 
+    paddingBottom: 40,
     maxHeight: '85%',
   },
   header: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 20,
+    flexDirection: 'row', 
+    justifyContent: 'space-between',
+    alignItems: 'center', 
+    marginBottom: 20,
   },
-  title: { color: '#f1f5f9', fontSize: 18, fontWeight: '800' },
-  close: { color: '#64748b', fontSize: 22 },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  title: { 
+    color: '#f1f5f9', 
+    fontSize: 18, 
+    fontWeight: '800',
+    includeFontPadding: false,
+  },
+  close: { 
+    color: IconColors.muted, 
+    fontSize: 22,
+  },
+  
   infoBox: {
-    backgroundColor: '#0c2a3a', borderRadius: 10,
-    padding: 14, marginBottom: 8,
-    borderWidth: 1, borderColor: '#1e3a5f',
+    backgroundColor: '#0c2a3a', 
+    borderRadius: 10,
+    padding: 14, 
+    marginBottom: 16,  // More spacing
+    borderWidth: 1, 
+    borderColor: '#1e3a5f',
   },
-  infoTitle:{ color: '#60a5fa', fontSize: 13, fontWeight: '700',
-    marginBottom: 6 },
-  infoText: { color: '#94a3b8', fontSize: 12, lineHeight: 18 },
-  infoCode: { color: '#22d3ee', fontFamily: 'monospace' },
-  label: {
-    color: '#64748b', fontSize: 11, fontWeight: '600',
-    textTransform: 'uppercase', letterSpacing: 0.5,
-    marginBottom: 8, marginTop: 16,
+  infoTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
   },
-  input: {
-    backgroundColor: '#0f172a', color: '#fff',
-    borderRadius: 10, padding: 12, fontSize: 14,
-    borderWidth: 1, borderColor: '#334155',
+  infoTitle: { 
+    color: '#60a5fa', 
+    fontSize: 13, 
+    fontWeight: '700',
+    includeFontPadding: false,
+  },
+  infoText: { 
+    color: '#94a3b8', 
+    fontSize: 12, 
+    lineHeight: 18,
+    includeFontPadding: false,
+  },
+  infoCode: { 
+    color: IconColors.primary, 
     fontFamily: 'monospace',
   },
-  typesRow: {
-    flexDirection: 'row', gap: 8, marginTop: 16, marginBottom: 4,
+  
+  label: {
+    color: IconColors.muted, 
+    fontSize: 11, 
+    fontWeight: '600',
+    textTransform: 'uppercase', 
+    letterSpacing: 0.5,
+    marginBottom: 8, 
+    marginTop: 16,
+    includeFontPadding: false,
   },
-  typeCard: {
-    flex: 1, backgroundColor: '#0f172a', borderRadius: 10,
-    padding: 10, alignItems: 'center',
-    borderWidth: 1, borderColor: '#334155',
+  input: {
+    backgroundColor: '#0f172a', 
+    color: '#fff',
+    borderRadius: 10, 
+    padding: 12, 
+    fontSize: 14,
+    borderWidth: 1, 
+    borderColor: '#334155',
+    fontFamily: 'monospace',
+    includeFontPadding: false,
   },
-  typeIcon: { fontSize: 22, marginBottom: 4 },
-  typeName: { color: '#94a3b8', fontSize: 11, fontWeight: '600' },
-  typeFreq: { color: '#475569', fontSize: 10 },
+  
   saveBtn: {
-    backgroundColor: '#22d3ee', borderRadius: 12,
-    padding: 14, alignItems: 'center', marginTop: 20,
+    backgroundColor: IconColors.primary, 
+    borderRadius: 12,
+    padding: 14, 
+    alignItems: 'center', 
+    marginTop: 20,
   },
-  saveBtnDim:  { backgroundColor: '#334155' },
-  saveBtnText: { color: '#0f172a', fontWeight: '800', fontSize: 15 },
+  saveBtnDim: {  
+    backgroundColor: '#334155',
+  },
+  saveBtnText: { 
+    color: '#0f172a', 
+    fontWeight: '800', 
+    fontSize: 15,
+    includeFontPadding: false,
+  },
 });

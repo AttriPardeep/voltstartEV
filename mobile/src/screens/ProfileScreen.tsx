@@ -8,6 +8,7 @@ import { useAuthStore } from '../store/authStore';
 import { api } from '../utils/api';
 import FleetSection from '../components/FleetSection';
 import RFIDSection from '../components/RFIDSection';
+import { AppIcon } from '../components/icons';
 
 // ─── Vehicle Database ─────────────────────────────────
 interface VehicleSpec {
@@ -189,7 +190,7 @@ function VehicleModal({
             <Text style={m.label}>Nickname (optional)</Text>
             <TextInput style={m.input} value={nickname}
               onChangeText={setNickname}
-              placeholder="e.g. My Nexon, Office Car"
+              placeholder="e.g. My MG, Office Car"
               placeholderTextColor="#475569" />
 
             {/* Brand selector */}
@@ -422,7 +423,10 @@ export default function ProfileScreen({ navigation }: any) {
       {userFleet && (
         <>
           <View style={s.sectionHeader}>
-            <Text style={s.sectionTitle}>🚛 Fleet</Text>
+            <View style={s.sectionTitleRow}>
+              <AppIcon.Van size={20} />
+              <Text style={s.sectionTitle}>Fleet</Text>
+            </View>
           </View>
           
           <TouchableOpacity 
@@ -430,7 +434,10 @@ export default function ProfileScreen({ navigation }: any) {
             onPress={() => navigation.navigate('FleetDashboard', { fleetId: userFleet.fleet_id })}
           >
             <View style={s.fleetHeader}>
-              <Text style={s.fleetIcon}>🏢</Text>
+              <View style={s.sectionTitleRow}>
+                <AppIcon.Van size={20} />
+                <Text style={s.sectionTitle}>Fleet</Text>
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={s.fleetName}>{userFleet.fleet_name}</Text>
                 <Text style={s.fleetRole}>
@@ -453,7 +460,7 @@ export default function ProfileScreen({ navigation }: any) {
 
       {/* Vehicles Section */}
       <View style={s.sectionHeader}>
-        <Text style={s.sectionTitle}>🚗 My Vehicles</Text>
+        <Text style={s.sectionTitle}><AppIcon.Car /> My Vehicles</Text>
         <TouchableOpacity style={s.addBtn}
           onPress={() => { setEditingVehicle(null); setShowModal(true); }}>
           <Text style={s.addBtnText}>+ Add</Text>
@@ -465,7 +472,9 @@ export default function ProfileScreen({ navigation }: any) {
       ) : vehicles.length === 0 ? (
         <TouchableOpacity style={s.emptyCard}
           onPress={() => { setEditingVehicle(null); setShowModal(true); }}>
-          <Text style={s.emptyIcon}>🚗</Text>
+          <View style={s.emptyIcon}>
+            <AppIcon.Car size={40} color="#64748b" />
+          </View>
           <Text style={s.emptyTitle}>No vehicles added</Text>
           <Text style={s.emptySub}>
             Add your EV for accurate charging estimates
@@ -506,12 +515,14 @@ export default function ProfileScreen({ navigation }: any) {
             </View>
 
             <View style={s.vehicleStats}>
-              <Text style={s.vehicleStat}>
-                🎯 Target: {vehicle.target_soc}%
-              </Text>
-              <Text style={s.vehicleStat}>
-                🔋 {vehicle.battery_kwh} kWh
-              </Text>
+              <View style={s.vehicleStatRow}>
+                <AppIcon.Target size={18} color="#94a3b8" />
+                <Text style={s.vehicleStat}>Target: {vehicle.target_soc}%</Text>
+              </View>
+              <View style={s.vehicleStatRow}>
+                <AppIcon.BatteryCharging size={20} color="#94a3b8" />
+                <Text style={s.vehicleStat}>{vehicle.battery_kwh} kWh</Text>
+              </View>
             </View>
 
             {/* Actions */}
@@ -570,6 +581,21 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 // ─── Styles ───────────────────────────────────────────
 const s = StyleSheet.create({
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  emptyIcon: {
+    marginBottom: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vehicleStatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   container: { flex: 1, backgroundColor: '#0f172a' },
   content: { padding: 20, paddingBottom: 40 },
   avatar: {
@@ -650,7 +676,6 @@ const s = StyleSheet.create({
   emptyCard: { backgroundColor: '#1e293b', borderRadius: 14,
     padding: 28, alignItems: 'center', marginBottom: 16,
     borderWidth: 2, borderColor: '#334155', borderStyle: 'dashed' },
-  emptyIcon: { fontSize: 40, marginBottom: 10 },
   emptyTitle: { color: '#e2e8f0', fontSize: 16, fontWeight: '700',
     marginBottom: 6 },
   emptySub: { color: '#64748b', fontSize: 13, textAlign: 'center',

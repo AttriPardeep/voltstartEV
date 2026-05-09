@@ -1,4 +1,4 @@
-// App.tsx
+// src/App.tsx
 import React, { useEffect, useRef } from 'react';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -6,13 +6,18 @@ import { StatusBar } from 'expo-status-bar';
 import { Text } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ThemeProvider } from './src/themes/ThemeContext';
+
 import MapScreen from './src/screens/MapScreen';
 import SessionScreen from './src/screens/SessionScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import LoginScreen from './src/screens/LoginScreen';
+import FleetDashboardScreen from './src/screens/FleetDashboardScreen';
+
 import { useAuthStore } from './src/store/authStore';
 import { useSessionStore } from './src/store/sessionStore';
+import WalletScreen from './src/screens/WalletScreen';
+
 import {
   registerForPushNotifications,
   savePushToken,
@@ -46,7 +51,6 @@ export default function App() {
   useEffect(() => {
     if (!token) return;
 
-    // Register device for push notifications
     registerForPushNotifications().then(pushToken => {
       if (pushToken) savePushToken(pushToken);
     });
@@ -134,7 +138,20 @@ export default function App() {
                 ),
               }}
             />
+            <Tab.Screen
+              name="Wallet"
+              component={WalletScreen}
+              options={{
+                title: 'Wallet',
+                tabBarIcon: ({ color }) => (
+                  <Text style={{ fontSize: 20, color }}>💰</Text>
+                ),
+              }}
+            />	
           </Tab.Navigator>
+          
+          {/* FleetDashboard as a Stack screen */}
+          {/* This is handled by the navigation prop passed to ProfileScreen */}
         </NavigationContainer>
       </GestureHandlerRootView>
     </ThemeProvider>

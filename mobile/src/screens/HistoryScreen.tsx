@@ -3,6 +3,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
 import { api } from '../utils/api';
 import { socket } from '../utils/socket';
+import { useNavigation } from '@react-navigation/native';
 
 interface Session {
   sessionId: number;
@@ -124,6 +125,48 @@ export default function HistoryScreen() {
     fetchHistory();
   }, [fetchHistory]);
 
+  const navigation = useNavigation();
+  useEffect(() => {
+    const handleBalanceCritical = (event: any) => {
+      const payload = event?.data || {};
+      const balance = Number(payload.currentBalance ?? 0);
+      const cost = Number(payload.costSoFar ?? 0);
+      Alert.alert(
+        '⚠️ Wallet Balance Critical',
+        `Your balance is ₹${balance.toFixed(2)}.\n\nYour charging session is being stopped automatically.\n\nCost so far: ₹${cost.toFixed(2)}`,
+        [
+          {
+            text: 'Add Money',
+            onPress: () => navigation.navigate('Wallet'),
+          },
+          { text: 'OK' },
+        ]
+      );
+    };
+    socket.on('balance_critical', handleBalanceCritical);
+    return () => {
+      socket.off('balance_critical', handleBalanceCritical);
+    };
+  }, [navigation]);
+  
+  useEffect(() => {
+    const handleSocTargetReached = (data: any) => {
+     const vehicleName = data?.vehicle || 'vehicle';
+     const targetSoc = data?.targetSoc ?? data?.currentSoc ?? '--';
+     
+     <CustomAlert
+       visible={socAlertVisible}
+       title="Target Charge Reached"
+       message={`Your ${vehicle} has reached ${targetSoc}% charge.\n\nCharging stopped.`}
+       variant="success"
+       onClose={() => setSocAlertVisible(false)}
+     />
+    };
+    
+    socket.on('soc_target_reached', handleSocTargetReached);
+    return () => socket.off('soc_target_reached', handleSocTargetReached);
+  }, [navigation]);
+  
   // ─────────────────────────────────────────────────────────────
   // Helpers
   // ─────────────────────────────────────────────────────────────

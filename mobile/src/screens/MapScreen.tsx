@@ -60,6 +60,8 @@ const ChargerMarker = React.memo(({ charger, onPress, isReserved }: {
   isReserved: boolean;
 }) => {
   // tracksViewChanges fix: allow one render cycle to measure, then lock
+  const [rendered, setRendered] = useState(false);
+
   const bgColor =
     isReserved              ? '#7c3aed' :   // purple for reserved
     charger.status === 'Available' ? '#10b981' :
@@ -77,21 +79,17 @@ const ChargerMarker = React.memo(({ charger, onPress, isReserved }: {
       anchor={{ x: 0.5, y: 1 }}
       // true until first layout, then false — stops flicker AND
       // ensures correct size on Fabric/New Architecture
-      tracksViewChanges={false}
+      tracksViewChanges={!rendered}
       stopPropagation
     >
       {/* explicit px dimensions required on Fabric */}
       <View
         style={{ width: MARKER_W + 12, height: MARKER_H + 10, alignItems: 'center' }}
+        onLayout={() => setRendered(true)}
       >
         <View style={[sq.badge, { backgroundColor: bgColor }]}>
           {/* Reservation icon overrides ⚡ when this connector is reserved */}
-          <MaterialCommunityIcons
-            name={isReserved ? 'clock-outline' : 'lightning-bolt'}
-            size={16}
-            color="#fff"
-            style={sq.icon}
-          />
+          <Text style={sq.icon}>{isReserved ? '🕐' : '⚡'}</Text>
           <Text style={sq.count}>{connectorLabel}</Text>
         </View>
         <View style={[sq.pointer, { borderTopColor: bgColor }]} />
@@ -503,8 +501,16 @@ export default function MapScreen({ navigation }: any) {
 
     startingRef.current = true;
     setStarting(true);
+
     try {
       const idTag = user?.idTag;
+console.log('🔍 Step 1 - Current user from auth store:', {
+      userId: user?.userId,
+      username: user?.username,
+      idTag: user?.idTag,
+      hasUser: !!user
+    });
+	
       if (!idTag) {
         Alert.alert(
           'Account Setup Incomplete',
@@ -529,6 +535,30 @@ export default function MapScreen({ navigation }: any) {
       const isTimeout = err?.code === 'ECONNABORTED'
         || err?.message?.includes('timeout')
         || err?.message?.includes('Network Error');
+	  const isInsufficientBalance =
+        err?.response?.status === 402 ||
+        err?.response?.data?.code === 'INSUFFICIENT_BALANCE';
+
+      if (isInsufficientBalance) {
+        const balance = err?.response?.data?.currentBalance ?? 0;
+        Alert.alert(
+          '💰 Insufficient Balance',
+          `Your wallet balance is ₹${Number(balance).toFixed(2)}.\n\nAdd at least ₹50 to start charging.`,
+          [
+            {
+              text: 'Add Money',
+              onPress: () => {
+                setModalVisible(false);
+                // Navigate to Wallet tab
+                navigation.navigate('Wallet');
+              }
+            },
+            { text: 'Cancel', style: 'cancel' }
+          ]
+        );
+        return;
+      }
+  
       Alert.alert(
         isTimeout ? '⏳ Connecting to Charger...' : 'Failed',
         isTimeout

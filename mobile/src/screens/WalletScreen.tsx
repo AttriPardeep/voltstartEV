@@ -5,21 +5,32 @@ import {
   ScrollView, ActivityIndicator, Alert,
   RefreshControl, TextInput, Modal
 } from 'react-native';
-import RazorpayCheckout from 'react-native-razorpay';
 import { api } from '../utils/api';
 import { useAuthStore } from '../store/authStore';
+import RazorpayCheckout from 'react-native-razorpay';
 import RazorpayWebView from '../components/RazorpayWebView';
 //import RazorpayCheckout from 'react-native-razorpay';
+import { AppIcon, IconColors, IconSize } from '../components/icons';
 
 // ── Quick load amounts ────────────────────────────────
 const QUICK_AMOUNTS = [100, 200, 500, 1000, 2000];
 
-// ── Transaction row component ─────────────────────────
+// ── Transaction row component (Icons instead of emojis) ────────────────────────
 function TxRow({ tx }: { tx: any }) {
   const isCredit = tx.type === 'credit' || tx.type === 'refund';
-  const icon = tx.type === 'credit'   ? '💰'
-             : tx.type === 'refund'   ? '↩️'
-             : tx.type === 'cashback' ? '🎁' : '⚡';
+  
+  // 
+  const getIcon = () => {
+    switch (tx.type) {
+      case 'credit':   return { Icon: AppIcon.Plus, color: IconColors.success };
+      case 'refund':   return { Icon: AppIcon.Refresh, color: IconColors.info };
+      case 'cashback': return { Icon: AppIcon.Star, color: IconColors.warning };
+      case 'charging': return { Icon: AppIcon.Zap, color: IconColors.primary };
+      default:         return { Icon: AppIcon.Activity, color: IconColors.muted };
+    }
+  };
+  
+  const { Icon, color } = getIcon();
 
   const date = new Date(tx.createdAt);
   const dateStr = date.toLocaleDateString('en-IN', {
@@ -28,8 +39,8 @@ function TxRow({ tx }: { tx: any }) {
 
   return (
     <View style={tx_s.row}>
-      <View style={tx_s.iconWrap}>
-        <Text style={tx_s.icon}>{icon}</Text>
+      <View style={[tx_s.iconWrap, { backgroundColor: color + '15' }]}>
+        <Icon size={IconSize.sm} color={color} />
       </View>
       <View style={tx_s.info}>
         <Text style={tx_s.desc} numberOfLines={1}>
@@ -38,8 +49,7 @@ function TxRow({ tx }: { tx: any }) {
         <Text style={tx_s.date}>{dateStr}</Text>
       </View>
       <View style={tx_s.amountWrap}>
-        <Text style={[tx_s.amount,
-          { color: isCredit ? '#22c55e' : '#ff3434' }]}>
+        <Text style={[tx_s.amount, { color: isCredit ? IconColors.success : IconColors.error }]}>
           {isCredit ? '+' : '-'}₹{tx.amount.toFixed(2)}
         </Text>
         <Text style={tx_s.balance}>
@@ -50,7 +60,7 @@ function TxRow({ tx }: { tx: any }) {
   );
 }
 
-// ── Load Money Modal ──────────────────────────────────
+// ── Add Money Modal ──────────────────────────────────
 function LoadMoneyModal({ visible, onClose, onSuccess }: {
   visible: boolean;
   onClose: () => void;
@@ -102,8 +112,9 @@ function LoadMoneyModal({ visible, onClose, onSuccess }: {
       if (verifyRes.data.success) {
         onSuccess(webViewData?.amount || 0);
         onClose();
+        // Only Text alert
         Alert.alert(
-          '💰 Wallet Loaded!',
+          'Wallet Loaded',
           `₹${webViewData?.amount} added.\nBalance: ₹${
             verifyRes.data.data.newBalance.toFixed(2)
           }`
@@ -121,7 +132,12 @@ function LoadMoneyModal({ visible, onClose, onSuccess }: {
       <View style={lm.overlay}>
         <View style={lm.sheet}>
           <View style={lm.handle} />
-          <Text style={lm.title}>Load Money</Text>
+          
+          {/* Header with icon */}
+          <View style={lm.titleRow}>
+            <AppIcon.Wallet size={IconSize.lg} color={IconColors.primary} />
+            <Text style={lm.title}>Load Money</Text>
+          </View>
 
           {/* Quick amounts */}
           <Text style={lm.label}>Quick Add</Text>
@@ -140,6 +156,7 @@ function LoadMoneyModal({ visible, onClose, onSuccess }: {
           <Text style={lm.label}>Custom Amount</Text>
           <View style={lm.inputRow}>
             <View style={lm.inputWrap}>
+              {/*  */}
               <Text style={lm.rupeeSign}>₹</Text>
               <TextInput
                 style={lm.input}
@@ -179,7 +196,7 @@ function LoadMoneyModal({ visible, onClose, onSuccess }: {
             <Text style={lm.cancelText}>Cancel</Text>
           </TouchableOpacity>
           
-          {/* Add RazorpayWebView inside LoadMoneyModal return */}
+          {/* RazorpayWebView */}
           {webViewData && (
             <RazorpayWebView
               visible={!!webViewData}
@@ -272,7 +289,7 @@ export default function WalletScreen() {
   if (loading) {
     return (
       <View style={w.loader}>
-        <ActivityIndicator size="large" color="#22d3ee" />
+        <ActivityIndicator size="large" color={IconColors.primary} />
       </View>
     );
   }
@@ -287,7 +304,7 @@ export default function WalletScreen() {
         contentContainerStyle={w.scrollContent}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh}
-            tintColor="#22d3ee" />
+            tintColor={IconColors.primary} />
         }
         onScroll={({ nativeEvent }) => {
           const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
@@ -304,13 +321,17 @@ export default function WalletScreen() {
             <Text style={w.balanceLabel}>WALLET BALANCE</Text>
             {isLowBalance && (
               <View style={w.lowBadge}>
-                <Text style={w.lowBadgeText}>⚠️ Low</Text>
+                <View style={w.lowBadgeContent}>
+                  <AppIcon.Warning size={IconSize.xs} color={IconColors.warning} />
+                  <Text style={w.lowBadgeText}>Low</Text>
+                </View>
               </View>
             )}
           </View>
 
+          {/*  */}
           <Text style={[w.balanceAmount,
-            { color: isLowBalance ? '#f59e0b' : '#22d3ee' }]}>
+            { color: isLowBalance ? IconColors.warning : IconColors.primary }]}>
             ₹{balance.toFixed(2)}
           </Text>
 
@@ -324,26 +345,32 @@ export default function WalletScreen() {
           <TouchableOpacity
             style={w.loadBtn}
             onPress={() => setShowLoad(true)}>
-            <Text style={w.loadBtnText}>+ Add Money</Text>
+            <View style={w.loadBtnContent}>
+              <AppIcon.Plus size={IconSize.sm} color="#0f172a" />
+              <Text style={w.loadBtnText}>Add Money</Text>
+            </View>
           </TouchableOpacity>
         </View>
 
         {/* Stats row */}
         <View style={w.statsRow}>
           <View style={w.statCard}>
+            <AppIcon.Plus size={IconSize.md} color={IconColors.success} />
             <Text style={w.statValue}>
               ₹{(wallet?.lifetimeLoaded ?? 0).toFixed(0)}
             </Text>
             <Text style={w.statLabel}>Total Loaded</Text>
           </View>
           <View style={w.statCard}>
+            <AppIcon.Zap size={IconSize.md} color={IconColors.error} />
             <Text style={w.statValue}>
               ₹{(wallet?.lifetimeSpent ?? 0).toFixed(0)}
             </Text>
             <Text style={w.statLabel}>Total Spent</Text>
           </View>
           <View style={w.statCard}>
-            <Text style={[w.statValue, { color: '#22c55e' }]}>
+            <AppIcon.Star size={IconSize.md} color={IconColors.success} />
+            <Text style={[w.statValue, { color: IconColors.success }]}>
               ₹{Math.max(0,
                 (wallet?.lifetimeLoaded ?? 0) -
                 (wallet?.lifetimeSpent ?? 0)
@@ -355,14 +382,19 @@ export default function WalletScreen() {
 
         {/* Transaction history */}
         <View style={w.historySection}>
-          <Text style={w.historyTitle}>Transaction History</Text>
+          <View style={w.historyTitleRow}>
+            <AppIcon.List size={IconSize.md} color={IconColors.primary} />
+            <Text style={w.historyTitle}>Transaction History</Text>
+          </View>
 
           {history.length === 0 ? (
             <View style={w.emptyHistory}>
-              <Text style={w.emptyIcon}>📭</Text>
+              <View style={w.emptyIcon}>
+                <AppIcon.Wallet size={IconSize.xl} color={IconColors.muted} />
+              </View>
               <Text style={w.emptyText}>No transactions yet</Text>
               <Text style={w.emptySub}>
-                Load money to start charging
+                Add money to start charging
               </Text>
             </View>
           ) : (
@@ -371,7 +403,7 @@ export default function WalletScreen() {
                 <TxRow key={tx.id} tx={tx} />
               ))}
               {loadingMore && (
-                <ActivityIndicator color="#22d3ee"
+                <ActivityIndicator color={IconColors.primary}
                   style={{ marginVertical: 16 }} />
               )}
               {!hasMore && history.length > 0 && (
@@ -418,6 +450,11 @@ const w = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 3,
     borderWidth: 1, borderColor: '#d97706',
   },
+  lowBadgeContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   lowBadgeText: { color: '#fcd34d', fontSize: 11, fontWeight: '700' },
   balanceAmount:{
     fontSize: 48, fontWeight: '800', letterSpacing: -1,
@@ -428,13 +465,18 @@ const w = StyleSheet.create({
     backgroundColor: '#22d3ee', borderRadius: 12,
     padding: 14, alignItems: 'center', marginTop: 8,
   },
+  loadBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   loadBtnText:  { color: '#0f172a', fontWeight: '800', fontSize: 15 },
 
   // Stats
   statsRow:     { flexDirection: 'row', gap: 10, marginBottom: 20 },
   statCard: {
     flex: 1, backgroundColor: '#1e293b', borderRadius: 12,
-    padding: 14, alignItems: 'center',
+    padding: 14, alignItems: 'center', gap: 8,
     borderWidth: 1, borderColor: '#334155',
   },
   statValue:    { color: '#f1f5f9', fontSize: 18, fontWeight: '800' },
@@ -444,11 +486,17 @@ const w = StyleSheet.create({
   // History
   historySection: { backgroundColor: '#1e293b', borderRadius: 16,
                     overflow: 'hidden' },
-  historyTitle:   { color: '#f1f5f9', fontSize: 16, fontWeight: '700',
-                    padding: 16, borderBottomWidth: 1,
-                    borderBottomColor: '#334155' },
+  historyTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#334155',
+  },
+  historyTitle:   { color: '#f1f5f9', fontSize: 16, fontWeight: '700' },
   emptyHistory:   { padding: 40, alignItems: 'center' },
-  emptyIcon:      { fontSize: 40, marginBottom: 10 },
+  emptyIcon:      { marginBottom: 10, alignItems: 'center', justifyContent: 'center' },
   emptyText:      { color: '#e2e8f0', fontSize: 16, fontWeight: '600',
                     marginBottom: 4 },
   emptySub:       { color: '#64748b', fontSize: 13 },
@@ -464,10 +512,8 @@ const tx_s = StyleSheet.create({
   },
   iconWrap: {
     width: 40, height: 40, borderRadius: 20,
-    backgroundColor: '#1e293b', alignItems: 'center',
-    justifyContent: 'center', marginRight: 12,
+    alignItems: 'center', justifyContent: 'center', marginRight: 12,
   },
-  icon:      { fontSize: 18 },
   info:      { flex: 1, marginRight: 8 },
   desc:      { color: '#e2e8f0', fontSize: 14, fontWeight: '500' },
   date:      { color: '#64748b', fontSize: 11, marginTop: 2 },
@@ -488,8 +534,13 @@ const lm = StyleSheet.create({
     width: 40, height: 4, backgroundColor: '#334155',
     borderRadius: 2, alignSelf: 'center', marginBottom: 20,
   },
-  title:    { color: '#f1f5f9', fontSize: 22, fontWeight: '800',
-               marginBottom: 20 },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 20,
+  },
+  title:    { color: '#f1f5f9', fontSize: 22, fontWeight: '800' },
   label:    { color: '#64748b', fontSize: 11, fontWeight: '600',
                textTransform: 'uppercase', letterSpacing: 0.5,
                marginBottom: 10 },

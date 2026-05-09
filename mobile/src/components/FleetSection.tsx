@@ -7,6 +7,7 @@ import {
 import { api } from '../utils/api';
 import { useAuthStore } from '../store/authStore';
 import { VEHICLES_BY_BRAND } from '../screens/ProfileScreen';
+import { AppIcon } from '../components/icons';
 
 interface FleetVehicle {
   id: number;
@@ -238,20 +239,39 @@ function CreateFleetForm({ onCreated }: { onCreated: () => void }) {
       <Text style={cf.label}>Billing Mode</Text>
       <View style={cf.modeRow}>
         {([
-          { key: 'fleet_pays',   label: '🏦 Fleet Pays',   sub: 'Company pays all sessions' },
-          { key: 'driver_pays',  label: '👤 Driver Pays',  sub: 'Each driver pays own session' },
-        ] as const).map(opt => (
-          <TouchableOpacity
-            key={opt.key}
-            style={[cf.modeCard, billingMode === opt.key && cf.modeCardActive]}
-            onPress={() => setBillingMode(opt.key)}>
-            <Text style={[cf.modeLabel,
-              billingMode === opt.key && cf.modeLabelActive]}>
-              {opt.label}
-            </Text>
-            <Text style={cf.modeSub}>{opt.sub}</Text>
-          </TouchableOpacity>
-        ))}
+          {
+            key: 'fleet_pays',
+            label: 'Fleet Pays',           
+            sub: 'Company pays all sessions',
+            icon: AppIcon.Wallet,          
+          },
+          {
+            key: 'driver_pays',
+            label: 'Driver Pays',          
+            sub: 'Each driver pays own session',
+            icon: AppIcon.User,            
+          },
+        ] as const).map(opt => {
+          const Icon = opt.icon;           
+          const isActive = billingMode === opt.key;
+          return (
+            <TouchableOpacity
+              key={opt.key}
+              style={[cf.modeCard, isActive && cf.modeCardActive]}
+              onPress={() => setBillingMode(opt.key)}>
+              
+              {/* */}
+              <View style={cf.modeLabelRow}>
+                <Icon size={18} color={isActive ? '#22d3ee' : '#94a3b8'} />
+                <Text style={[cf.modeLabel, isActive && cf.modeLabelActive]}>
+                  {opt.label}
+                </Text>
+              </View>
+              
+              <Text style={cf.modeSub}>{opt.sub}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       <Text style={cf.label}>Monthly Budget ₹ (optional)</Text>
@@ -388,33 +408,19 @@ export default function FleetSection({ userId }: { userId: number }) {
   }
 
   // No fleet yet — show create button
-   if (!fleet) {
-     return (
-       <View style={s.card}>
-         <Text style={s.cardTitle}>🏢 Fleet Management</Text>
-         <CreateFleetForm onCreated={fetchFleet} />
-       </View>
-     );
-   }
-/*
   if (!fleet) {
     return (
       <View style={s.card}>
-        <Text style={s.cardTitle}>🏢 Fleet Management</Text>
-        <Text style={s.noFleet}>
-          You have fleet admin access but no fleet created yet.
-        </Text>
-        <TouchableOpacity style={s.createBtn}
-          onPress={() => Alert.alert(
-            'Create Fleet',
-            'Contact support to set up your corporate fleet account.'
-          )}>
-          <Text style={s.createBtnText}>Contact Support to Create Fleet</Text>
-        </TouchableOpacity>
+        {/* Icon + Text properly aligned */}
+        <View style={s.sectionTitleRow}>
+          <AppIcon.FleetBuilding size={24} color="#22d3ee" />
+          <Text style={s.sectionTitle}>Fleet</Text>
+        </View>
+        <CreateFleetForm onCreated={fetchFleet} />
       </View>
     );
   }
-*/
+
   return (
     <View style={s.card}>
       {/* Header */}
@@ -506,13 +512,26 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: '#334155',
   },
   createBtnText: { color: '#94a3b8', fontSize: 13 },
+  
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',    // Vertically center icon + text
+    gap: 8,                  // Space between icon and text
+    marginBottom: 4,        // Space below header
+  },
+  
+  // Larger, bold section title text
+  sectionTitle: {
+    color: '#f1f5f9',        // Light color for contrast
+    fontSize: 18,            // Larger font (was 10)
+    fontWeight: '700',       // Bold for emphasis
+    lineHeight: 24,          // Better vertical spacing
+    letterSpacing: 0.5,      // Slight letter spacing for readability
+  },
+  
   vehiclesHeader: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', marginTop: 16, marginBottom: 10,
-  },
-  sectionTitle: {
-    color: '#475569', fontSize: 10, fontWeight: '700',
-    letterSpacing: 1, textTransform: 'uppercase',
   },
   addBtn: {
     backgroundColor: '#22d3ee', borderRadius: 16,
