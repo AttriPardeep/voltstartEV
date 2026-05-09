@@ -12,7 +12,9 @@ import { useAuthStore } from '../store/authStore';
 import { useFilterStore } from '../store/filterStore';
 import AssistantChat from '../components/AssistantChat';
 import { api } from '../utils/api';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+
+// ✅ Import icon system
+import { AppIcon, IconColors, IconSize } from '../components/icons';
 
 const STATUS_COLOR: Record<string, string> = {
   Available:   '#22c55e',
@@ -43,27 +45,19 @@ const PRICE_OPTIONS = [
 ];
 
 // ─────────────────────────────────────────────────────
-// Three changes:
-//   a) tracksViewChanges={!rendered} → true on first frame only,
-//      then locked false via onLayout. This is the correct Fabric
-//      (New Architecture) pattern for custom view markers.
-//   b) Added `isReserved` prop so the marker can show 🕐 badge.
-//   c) Custom memo comparator — only re-render when status,
-//      connector counts, or reservation state actually changes.
+// ChargerMarker - Icons instead of emojis
 // ─────────────────────────────────────────────────────
-const MARKER_W = 44;
-const MARKER_H = 48;
+const MARKER_W = 44;const MARKER_H = 48;
 
 const ChargerMarker = React.memo(({ charger, onPress, isReserved }: {
   charger: Charger;
   onPress: (c: Charger) => void;
   isReserved: boolean;
 }) => {
-  // tracksViewChanges fix: allow one render cycle to measure, then lock
   const [rendered, setRendered] = useState(false);
 
   const bgColor =
-    isReserved              ? '#7c3aed' :   // purple for reserved
+    isReserved              ? '#7c3aed' :
     charger.status === 'Available' ? '#10b981' :
     charger.status === 'Busy'      ? '#f59e0b' :
     charger.status === 'Charging'  ? '#3b82f6' :
@@ -77,19 +71,20 @@ const ChargerMarker = React.memo(({ charger, onPress, isReserved }: {
       coordinate={{ latitude: charger.latitude, longitude: charger.longitude }}
       onPress={() => onPress(charger)}
       anchor={{ x: 0.5, y: 1 }}
-      // true until first layout, then false — stops flicker AND
-      // ensures correct size on Fabric/New Architecture
       tracksViewChanges={!rendered}
       stopPropagation
     >
-      {/* explicit px dimensions required on Fabric */}
       <View
         style={{ width: MARKER_W + 12, height: MARKER_H + 10, alignItems: 'center' }}
         onLayout={() => setRendered(true)}
       >
         <View style={[sq.badge, { backgroundColor: bgColor }]}>
-          {/* Reservation icon overrides ⚡ when this connector is reserved */}
-          <Text style={sq.icon}>{isReserved ? '🕐' : '⚡'}</Text>
+          {/* ✅ Icon instead of emoji */}
+          {isReserved ? (
+            <AppIcon.Clock size={20} color="#fff" />
+          ) : (
+            <AppIcon.Zap size={20} color="#fff" />
+          )}
           <Text style={sq.count}>{connectorLabel}</Text>
         </View>
         <View style={[sq.pointer, { borderTopColor: bgColor }]} />
@@ -97,13 +92,11 @@ const ChargerMarker = React.memo(({ charger, onPress, isReserved }: {
     </Marker>
   );
 },
-// custom comparator — skip re-render if nothing visible changed
 (prev, next) =>
   prev.charger.status              === next.charger.status &&
   prev.charger.availableConnectors === next.charger.availableConnectors &&
   prev.charger.totalConnectors     === next.charger.totalConnectors &&
-  prev.isReserved                  === next.isReserved
-);
+  prev.isReserved                  === next.isReserved);
 
 // ── Marker styles ─────────────────────────────────────
 const sq = StyleSheet.create({
@@ -120,12 +113,6 @@ const sq = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 4,
     elevation: 6,
-  },
-  icon: {
-    fontSize: 20,
-    color: '#fff',
-    marginBottom: 1,
-    includeFontPadding: false,
   },
   count: {
     fontSize: 11,
@@ -158,7 +145,6 @@ function PricingCard({ charger, connectorId, user }: {
   useEffect(() => {
     if (!connectorId) { setEstimate(null); return; }
     if (!charger.pricing) return;
-
     setLoading(true);
     const params = new URLSearchParams({
       connectorId: connectorId.toString(),
@@ -179,7 +165,11 @@ function PricingCard({ charger, connectorId, user }: {
   if (!charger.pricing) {
     return (
       <View style={pc.card}>
-        <Text style={pc.title}>💰 Pricing</Text>
+        {/* ✅ Icon + Text instead of emoji */}
+        <View style={pc.titleRow}>
+          <AppIcon.Rupee size={IconSize.md} color={IconColors.info} />
+          <Text style={pc.title}>Pricing</Text>
+        </View>
         <Text style={pc.noVehicle}>Contact operator for pricing details</Text>
       </View>
     );
@@ -190,7 +180,10 @@ function PricingCard({ charger, connectorId, user }: {
   return (
     <View style={pc.card}>
       <View style={pc.header}>
-        <Text style={pc.title}>💰 Pricing</Text>
+        <View style={pc.titleRow}>
+          <AppIcon.Rupee size={IconSize.md} color={IconColors.info} />
+          <Text style={pc.title}>Pricing</Text>
+        </View>
         <Text style={pc.rateName}>{pricing.displayName}</Text>
       </View>
 
@@ -201,8 +194,7 @@ function PricingCard({ charger, connectorId, user }: {
           <Text style={pc.feeText}>
             + ₹{pricing.sessionFee.toFixed(0)} session fee
           </Text>
-        </View>
-      )}
+        </View>      )}
 
       {!!pricing.tiers?.length && (
         <View style={pc.tiers}>
@@ -231,7 +223,11 @@ function PricingCard({ charger, connectorId, user }: {
 
       {connectorId && estimate && !loading && (
         <View style={pc.estimate}>
-          <Text style={pc.estimateTitle}>📊 Your Estimate</Text>
+          {/* ✅ Icon + Text instead of emoji */}
+          <View style={pc.estimateTitleRow}>
+            <AppIcon.TrendingUp size={IconSize.sm} color={IconColors.muted} />
+            <Text style={pc.estimateTitle}>Your Estimate</Text>
+          </View>
           {estimate.estimatedCost != null ? (
             <>
               <View style={pc.estimateRow}>
@@ -247,8 +243,7 @@ function PricingCard({ charger, connectorId, user }: {
                     ~{estimate.estimatedDuration} min
                   </Text>
                 </View>
-              )}
-              <Text style={pc.breakdown}>{estimate.breakdown}</Text>
+              )}              <Text style={pc.breakdown}>{estimate.breakdown}</Text>
             </>
           ) : (
             <Text style={pc.noVehicle}>
@@ -290,7 +285,17 @@ function FilterSheet({ visible, onClose }: {
             onPress={() => setFilters({ availability: v })}>
             <Text style={[fs.chipText,
               filters.availability === v && fs.chipTextActive]}>
-              {v === 'all' ? '🔌 All' : '✅ Available Only'}
+              {/* ✅ Icon + Text instead of emoji */}
+              {v === 'all' ? (
+                <View style={fs.chipContent}>
+                  <AppIcon.Plug size={IconSize.xs} color="#64748b" />
+                  <Text>All</Text>
+                </View>
+              ) : (
+                <View style={fs.chipContent}>                  <AppIcon.Success size={IconSize.xs} color="#10b981" />
+                  <Text>Available Only</Text>
+                </View>
+              )}
             </Text>
           </TouchableOpacity>
         ))}
@@ -336,8 +341,7 @@ function FilterSheet({ visible, onClose }: {
             <Text style={[fs.chipText,
               filters.maxPrice === opt.value && fs.chipTextActive]}>
               {opt.label}
-            </Text>
-          </TouchableOpacity>
+            </Text>          </TouchableOpacity>
         ))}
       </ScrollView>
 
@@ -375,11 +379,8 @@ export default function MapScreen({ navigation }: any) {
   const startingRef = useRef(false);
   const mapRef      = useRef<MapView>(null);
 
-  // derive isReserved from activeReservation for marker
-  // This lets ChargerMarker show 🕐 without needing a separate API call
-  const reservedChargeBoxId = activeReservation?.chargeBoxId ?? null;
+  const reservedChargeBoxId = activeReservation?.chargeBoxBoxId ?? null;
 
-  // filteredChargers computed before any useEffect that references it
   const filteredChargers = useMemo(() =>
     (chargers || []).filter(c => {
       if (filters.availability === 'available' && c.status !== 'Available')
@@ -389,8 +390,7 @@ export default function MapScreen({ navigation }: any) {
       if (filters.maxDistance < 999 && c.distance != null
         && c.distance > filters.maxDistance)
         return false;
-      if (filters.maxPrice < 999 && c.pricing?.ratePerKwh != null
-        && c.pricing.ratePerKwh > filters.maxPrice)
+      if (filters.maxPrice < 999 && c.pricing?.ratePerKwh != null        && c.pricing.ratePerKwh > filters.maxPrice)
         return false;
       return true;
     }),
@@ -403,18 +403,15 @@ export default function MapScreen({ navigation }: any) {
     filters.maxPrice < 999,
   ].filter(Boolean).length;
 
-  // Initial load + polling
   useEffect(() => {
     requestLocation();
     fetchActiveSession();
     fetchChargers();
     
-    // 2 min polling instead of 30s — WebSocket handles real-time updates
     const interval = setInterval(fetchChargers, 2 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // Load active reservation once on mount
   useEffect(() => {
     api.get('/api/reservations/active')
       .then(r => {
@@ -425,7 +422,6 @@ export default function MapScreen({ navigation }: any) {
       .catch(() => {});
   }, []);
 
-  // Refresh reservation when modal opens for a new charger
   useEffect(() => {
     if (!modalVisible) return;
     api.get('/api/reservations/active')
@@ -433,7 +429,6 @@ export default function MapScreen({ navigation }: any) {
       .catch(() => setActiveReservation(null));
   }, [modalVisible, selected?.chargeBoxId]);
 
-  // Center on user location
   useEffect(() => {
     if (!userLocation?.latitude || !mapRef.current) return;
     setTimeout(() => {
@@ -445,8 +440,6 @@ export default function MapScreen({ navigation }: any) {
       }, 1000);
     }, 800);
   }, [userLocation?.latitude, userLocation?.longitude]);
-
-  // Fit to chargers only if no user location
   useEffect(() => {
     if (userLocation?.latitude) return;
     if (!filteredChargers.length || !mapRef.current) return;
@@ -479,7 +472,6 @@ export default function MapScreen({ navigation }: any) {
   };
 
   const handleStartCharging = async () => {
-    // Block charging when offline — suggest RFID instead
     if (isOffline) {
       Alert.alert(
         'Offline Mode',
@@ -496,21 +488,14 @@ export default function MapScreen({ navigation }: any) {
     if (activeSession) {
       Alert.alert('Active Session',
         'You already have an active charging session.');
-      return;
-    }
+      return;    }
 
     startingRef.current = true;
     setStarting(true);
 
     try {
       const idTag = user?.idTag;
-console.log('🔍 Step 1 - Current user from auth store:', {
-      userId: user?.userId,
-      username: user?.username,
-      idTag: user?.idTag,
-      hasUser: !!user
-    });
-	
+      
       if (!idTag) {
         Alert.alert(
           'Account Setup Incomplete',
@@ -524,11 +509,10 @@ console.log('🔍 Step 1 - Current user from auth store:', {
       await startSession(selected.chargeBoxId, selectedConnector, idTag);
       setModalVisible(false);
       setSelectedConnector(null);
-      // Clear reservation if session started on reserved connector
       if (activeReservation?.chargeBoxId === selected.chargeBoxId) {
         setActiveReservation(null);
       }
-      Alert.alert('✅ Charging Started',
+      Alert.alert('Charging Started',
         `Session started on ${selected.chargeBoxId} Connector ${selectedConnector}`);
       fetchActiveSession();
     } catch (err: any) {
@@ -542,25 +526,23 @@ console.log('🔍 Step 1 - Current user from auth store:', {
       if (isInsufficientBalance) {
         const balance = err?.response?.data?.currentBalance ?? 0;
         Alert.alert(
-          '💰 Insufficient Balance',
+          'Insufficient Balance',
           `Your wallet balance is ₹${Number(balance).toFixed(2)}.\n\nAdd at least ₹50 to start charging.`,
           [
             {
               text: 'Add Money',
               onPress: () => {
                 setModalVisible(false);
-                // Navigate to Wallet tab
                 navigation.navigate('Wallet');
               }
             },
             { text: 'Cancel', style: 'cancel' }
-          ]
-        );
+          ]        );
         return;
       }
   
       Alert.alert(
-        isTimeout ? '⏳ Connecting to Charger...' : 'Failed',
+        isTimeout ? 'Connecting to Charger...' : 'Failed',
         isTimeout
           ? 'The charger is responding. Check the Session tab in 30 seconds.'
           : err?.response?.data?.error || err?.message || 'Could not start session',
@@ -576,11 +558,10 @@ console.log('🔍 Step 1 - Current user from auth store:', {
   };
 
   const handleReserve = async () => {
-    //Block reservation when offline
     if (isOffline) {
       Alert.alert(
         'Offline Mode',
-        'Reservations cannot be made while offline. Please connect to Team to reserve a charger.',
+        'Reservations cannot be made while offline. Please connect to internet to reserve a charger.',
         [{ text: 'OK' }]
       );
       return;
@@ -595,8 +576,6 @@ console.log('🔍 Step 1 - Current user from auth store:', {
       const newReservation = res.data.data;
       setActiveReservation(newReservation);
 
-      // Fetch fresh chargers THEN use store's updated array
-      // use store getter after fetch to avoid stale closure
       await fetchChargers();
       const freshChargers = useChargerStore.getState().chargers;
       const updatedCharger = freshChargers.find(
@@ -606,9 +585,8 @@ console.log('🔍 Step 1 - Current user from auth store:', {
 
       setModalVisible(false);
       Alert.alert(
-        '🕐 Reserved!',
-        `Connector #${selectedConnector} on ${selected.chargeBoxId} is held for 30 minutes.`
-      );
+        'Reserved',
+        `Connector #${selectedConnector} on ${selected.chargeBoxId} is held for 30 minutes.`      );
     } catch (err: any) {
       Alert.alert('Failed', err?.response?.data?.error || 'Could not reserve');
     } finally {
@@ -631,10 +609,8 @@ console.log('🔍 Step 1 - Current user from auth store:', {
             try {
               await api.delete(`/api/reservations/${activeReservation.id}`);
 
-              // Clear reservation state FIRST
               setActiveReservation(null);
 
-              // use store getter after fetch — not stale closure `chargers`
               await fetchChargers();
               const freshChargers = useChargerStore.getState().chargers;
               const updatedCharger = freshChargers.find(
@@ -659,8 +635,7 @@ console.log('🔍 Step 1 - Current user from auth store:', {
         const c = (chargers || []).find(x => x.chargeBoxId === action.chargeBoxId);
         if (c) {
           setSelected(c);
-          setModalVisible(true);
-          mapRef.current?.animateToRegion({
+          setModalVisible(true);          mapRef.current?.animateToRegion({
             latitude: c.latitude, longitude: c.longitude,
             latitudeDelta: 0.05, longitudeDelta: 0.05,
           }, 800);
@@ -690,7 +665,6 @@ console.log('🔍 Step 1 - Current user from auth store:', {
         showsMyLocationButton
       >
         {filteredChargers.map(charger => (
-          // pass isReserved so marker shows 🕐 icon
           <ChargerMarker
             key={charger.chargeBoxId}
             charger={charger}
@@ -705,12 +679,12 @@ console.log('🔍 Step 1 - Current user from auth store:', {
         <TouchableOpacity
           style={[s.filterBtn, activeFilterCount > 0 && s.filterBtnActive]}
           onPress={toggleFilterSheet}>
-          <Text style={s.filterIcon}>⚙️</Text>
+          {/* ✅ Icon instead of emoji */}
+          <AppIcon.Filter size={IconSize.sm} color={activeFilterCount > 0 ? IconColors.primary : '#94a3b8'} />
           <Text style={[s.filterTxt, activeFilterCount > 0 && s.filterTxtActive]}>
             Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
           </Text>
         </TouchableOpacity>
-
         <View style={s.countBadge}>
           <Text style={s.countTxt}>
             {filteredChargers.length}/{chargers?.length || 0} chargers
@@ -721,7 +695,10 @@ console.log('🔍 Step 1 - Current user from auth store:', {
       {/* Offline banner */}
       {isOffline === true && (
         <View style={s.offlineBanner}>
-          <Text style={s.offlineTitle}>📴 Offline Mode</Text>
+          <View style={s.offlineTitleRow}>
+            <AppIcon.WifiOff size={IconSize.xs} color={IconColors.warning} />
+            <Text style={s.offlineTitle}>Offline Mode</Text>
+          </View>
           <Text style={s.offlineText}>
             {cacheAge
               ? `Cached data from ${cacheAge} — availability may differ`
@@ -730,14 +707,17 @@ console.log('🔍 Step 1 - Current user from auth store:', {
         </View>
       )}
 
-      {/* Active reservation global banner (visible outside modal) */}
+      {/* Active reservation global banner */}
       {activeReservation && !modalVisible && (
         <View style={s.globalReservationBanner}>
-          <Text style={s.globalReservationText}>
-            🕐 Reservation active — {Math.max(0, Math.floor(
-              (new Date(activeReservation.expiresAt).getTime() - Date.now()) / 60000
-            ))} min left on {activeReservation.chargeBoxId}
-          </Text>
+          <View style={s.globalReservationTextRow}>
+            <AppIcon.Clock size={IconSize.xs} color={IconColors.primary} />
+            <Text style={s.globalReservationText}>
+              Reservation active — {Math.max(0, Math.floor(
+                (new Date(activeReservation.expiresAt).getTime() - Date.now()) / 60000
+              ))} min left on {activeReservation.chargeBoxId}
+            </Text>
+          </View>
           <TouchableOpacity onPress={handleCancelReservation}>
             <Text style={s.globalReservationCancel}>Cancel</Text>
           </TouchableOpacity>
@@ -753,8 +733,7 @@ console.log('🔍 Step 1 - Current user from auth store:', {
           ['Reserved',  '#7c3aed'],
           ['Offline',   '#6b7280'],
         ].map(([label, color]) => (
-          <View key={label} style={s.legendItem}>
-            <View style={[s.legendDot, { backgroundColor: color }]} />
+          <View key={label} style={s.legendItem}>            <View style={[s.legendDot, { backgroundColor: color }]} />
             <Text style={s.legendText}>{label}</Text>
           </View>
         ))}
@@ -795,23 +774,29 @@ console.log('🔍 Step 1 - Current user from auth store:', {
                   </TouchableOpacity>
                 </View>
 
-                {/* Info */}
-                <Text style={s.infoRow}>
-                  📍 {selected.street}, {selected.city}
-                </Text>
+                {/* Info - Icons instead of emojis */}
+                <View style={s.infoRow}>
+                  <AppIcon.Location size={IconSize.sm} color={IconColors.muted} />
+                  <Text style={s.infoText}>{selected.street}, {selected.city}</Text>
+                </View>
                 {selected.distance != null && (
-                  <Text style={s.infoRow}>
-                    📏 {selected.distance < 1
-                      ? `${Math.round(selected.distance * 1000)}m away`
-                      : `${selected.distance.toFixed(1)}km away`}
-                  </Text>
+                  <View style={s.infoRow}>
+                    <AppIcon.Navigation size={IconSize.sm} color={IconColors.muted} />
+                    <Text style={s.infoText}>                      {selected.distance < 1
+                        ? `${Math.round(selected.distance * 1000)}m away`
+                        : `${selected.distance.toFixed(1)}km away`}
+                    </Text>
+                  </View>
                 )}
-                <Text style={s.infoRow}>
-                  ⚡ {selected.availableConnectors}/{selected.totalConnectors} available
-                  {selected.maxPower
-                    ? `  ·  ${(selected.maxPower / 1000).toFixed(0)} kW max`
-                    : ''}
-                </Text>
+                <View style={s.infoRow}>
+                  <AppIcon.Zap size={IconSize.sm} color={IconColors.muted} />
+                  <Text style={s.infoText}>
+                    {selected.availableConnectors}/{selected.totalConnectors} available
+                    {selected.maxPower
+                      ? `  ·  ${(selected.maxPower / 1000).toFixed(0)} kW max`
+                      : ''}
+                  </Text>
+                </View>
 
                 {/* Status + Navigate */}
                 <View style={s.actionRow}>
@@ -828,7 +813,10 @@ console.log('🔍 Step 1 - Current user from auth store:', {
                   </View>
                   <TouchableOpacity style={s.navigateBtn}
                     onPress={() => handleNavigate(selected)}>
-                    <Text style={s.navigateTxt}>🧭 Navigate</Text>
+                    <View style={s.navigateBtnContent}>
+                      <AppIcon.Navigation size={IconSize.xs} color={IconColors.primary} />
+                      <Text style={s.navigateTxt}>Navigate</Text>
+                    </View>
                   </TouchableOpacity>
                 </View>
 
@@ -843,9 +831,11 @@ console.log('🔍 Step 1 - Current user from auth store:', {
                 {activeReservation?.chargeBoxId === selected?.chargeBoxId && (
                   <View style={s.reservationBanner}>
                     <View>
-                      <Text style={s.reservationBannerText}>
-                        🕐 Your reservation is active
-                      </Text>
+                      <View style={s.reservationBannerTextRow}>                        <AppIcon.Clock size={IconSize.xs} color={IconColors.primary} />
+                        <Text style={s.reservationBannerText}>
+                          Your reservation is active
+                        </Text>
+                      </View>
                       <Text style={[s.reservationBannerText,
                         { fontSize: 11, opacity: 0.8 }]}>
                         Connector #{activeReservation.connectorId} · expires in{' '}
@@ -867,7 +857,6 @@ console.log('🔍 Step 1 - Current user from auth store:', {
                   {(selected.connectors || []).map(conn => {
                     const available   = conn.status === 'Available';
                     const isReserved  = conn.status === 'Reserved';
-                    // also highlight if THIS connector is the one we reserved
                     const isMyRes     =
                       activeReservation?.chargeBoxId === selected.chargeBoxId &&
                       activeReservation?.connectorId === conn.connectorId;
@@ -891,12 +880,14 @@ console.log('🔍 Step 1 - Current user from auth store:', {
                         onPress={() =>
                           (available || isMyRes) &&
                           setSelectedConnector(conn.connectorId)
-                        }
-                        disabled={!available && !isMyRes}
+                        }                        disabled={!available && !isMyRes}
                       >
-                        <Text style={s.connIcon}>
-                          {isMyRes ? '🕐' : '🔌'}
-                        </Text>
+                        {/* ✅ Icon instead of emoji */}
+                        {isMyRes ? (
+                          <AppIcon.Clock size={20} color="#c4b5fd" />
+                        ) : (
+                          <AppIcon.Plug size={20} color={clr} />
+                        )}
                         <Text style={s.connId}>#{conn.connectorId}</Text>
                         <View style={[s.connDot, { backgroundColor: clr }]} />
                         <Text style={[s.connStatus, { color: clr }]}>
@@ -922,22 +913,30 @@ console.log('🔍 Step 1 - Current user from auth store:', {
                       disabled={!selectedConnector || starting}>
                       {starting
                         ? <ActivityIndicator color="#0f172a" />
-                        : <Text style={s.startBtnTxt}>
-                            ⚡ Start on Connector {selectedConnector}
-                          </Text>}
+                        : (
+                          <View style={s.startBtnContent}>
+                            <AppIcon.Zap size={IconSize.sm} color="#0f172a" />
+                            <Text style={s.startBtnTxt}>
+                              Start on Connector {selectedConnector}
+                            </Text>
+                          </View>
+                        )}
                     </TouchableOpacity>
 
-                    {/* Only show Reserve if no active reservation on this charger */}
                     {!activeReservation && (
                       <TouchableOpacity
                         style={s.reserveBtn}
                         onPress={handleReserve}
                         disabled={reserving}>
                         {reserving
-                          ? <ActivityIndicator color="#22d3ee" />
-                          : <Text style={s.reserveBtnTxt}>
-                              🕐 Reserve for 30 min
-                            </Text>}
+                          ? <ActivityIndicator color="#22d3ee" />                          : (
+                            <View style={s.reserveBtnContent}>
+                              <AppIcon.Clock size={IconSize.sm} color={IconColors.primary} />
+                              <Text style={s.reserveBtnTxt}>
+                                Reserve for 30 min
+                              </Text>
+                            </View>
+                          )}
                       </TouchableOpacity>
                     )}
                   </View>
@@ -969,7 +968,6 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: '#334155',
   },
   filterBtnActive: { borderColor: '#22d3ee', backgroundColor: '#0c4a6eee' },
-  filterIcon: { fontSize: 14 },
   filterTxt:       { color: '#94a3b8', fontSize: 13, fontWeight: '600' },
   filterTxtActive: { color: '#22d3ee' },
   countBadge: {
@@ -980,14 +978,18 @@ const s = StyleSheet.create({
   offlineBanner: {
     position: 'absolute', top: 60, left: 16, right: 16,
     backgroundColor: '#78350f', borderRadius: 10,
-    padding: 12, borderWidth: 1, borderColor: '#d97706',
+    padding: 12, borderWidth: 1, borderColor: '#d97706',  },
+  offlineTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 2,
   },
   offlineTitle: {
-    color: '#fcd34d', fontSize: 13, fontWeight: '700', marginBottom: 2,
+    color: '#fcd34d', fontSize: 13, fontWeight: '700',
   },
   offlineText: { color: '#fde68a', fontSize: 12, lineHeight: 16 },
 
-  // global reservation banner visible on map when modal is closed
   globalReservationBanner: {
     position: 'absolute', top: 60, left: 16, right: 16,
     backgroundColor: '#3b0764', borderRadius: 10,
@@ -995,8 +997,14 @@ const s = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center',
   },
+  globalReservationTextRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flex: 1,
+  },
   globalReservationText: {
-    color: '#c4b5fd', fontSize: 12, fontWeight: '600', flex: 1,
+    color: '#c4b5fd', fontSize: 12, fontWeight: '600',
   },
   globalReservationCancel: {
     color: '#f87171', fontSize: 12, fontWeight: '700', marginLeft: 8,
@@ -1019,8 +1027,7 @@ const s = StyleSheet.create({
     backgroundColor: '#00000066',
     justifyContent: 'flex-end',
   },
-  modalOverlay: {
-    flex: 1, backgroundColor: '#00000088', justifyContent: 'flex-end',
+  modalOverlay: {    flex: 1, backgroundColor: '#00000088', justifyContent: 'flex-end',
   },
   modalCard: {
     backgroundColor: '#1e293b', borderTopLeftRadius: 24,
@@ -1034,7 +1041,13 @@ const s = StyleSheet.create({
   modalName:  { color: '#94a3b8', fontSize: 12, marginTop: 2 },
   closeBtn:   { padding: 4, marginLeft: 8 },
   closeTxt:   { color: '#64748b', fontSize: 20 },
-  infoRow:    { color: '#94a3b8', fontSize: 13, marginBottom: 4 },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  infoText: { color: '#94a3b8', fontSize: 13 },
   actionRow: {
     flexDirection: 'row', alignItems: 'center',
     justifyContent: 'space-between', marginVertical: 10,
@@ -1050,6 +1063,11 @@ const s = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 8,
     borderWidth: 1, borderColor: '#22d3ee',
   },
+  navigateBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   navigateTxt: { color: '#22d3ee', fontSize: 13, fontWeight: '700' },
   sectionTitle: {
     color: '#475569', fontSize: 11, fontWeight: '700',
@@ -1058,25 +1076,21 @@ const s = StyleSheet.create({
   connectorGrid: {
     flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20,
   },
-  connCard: {
-    borderWidth: 2, borderRadius: 12, padding: 12,
+  connCard: {    borderWidth: 2, borderRadius: 12, padding: 12,
     alignItems: 'center', minWidth: 80, backgroundColor: '#0f172a',
   },
   connCardSel:        { backgroundColor: '#0c4a6e' },
   connCardDim:        { opacity: 0.4 },
-  // my reservation: purple highlight
   connCardMyReserved: {
     backgroundColor: '#2e1065',
     borderColor: '#7c3aed',
     borderWidth: 2,
   },
-  // Someone else's reservation: amber
   connCardReserved: {
     backgroundColor: '#1c1a0e',
     borderColor: '#f59e0b',
     borderWidth: 2,
   },
-  connIcon:   { fontSize: 20, marginBottom: 4 },
   connId:     { color: '#f1f5f9', fontSize: 14, fontWeight: '700' },
   connDot:    { width: 6, height: 6, borderRadius: 3, marginTop: 4 },
   connStatus: { fontSize: 10, marginTop: 2 },
@@ -1090,18 +1104,33 @@ const s = StyleSheet.create({
     backgroundColor: '#22d3ee', borderRadius: 14,
     padding: 16, alignItems: 'center', marginTop: 4,
   },
+  startBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   startBtnDim: { backgroundColor: '#334155' },
   startBtnTxt: { color: '#0f172a', fontWeight: '800', fontSize: 15 },
   reserveBtn: {
     borderRadius: 14, padding: 14, alignItems: 'center',
     borderWidth: 2, borderColor: '#22d3ee', backgroundColor: 'transparent',
   },
+  reserveBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   reserveBtnTxt: { color: '#22d3ee', fontWeight: '700', fontSize: 15 },
   reservationBanner: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', backgroundColor: '#2e1065',
     borderRadius: 10, padding: 12, marginBottom: 12,
-    borderWidth: 1, borderColor: '#7c3aed',
+    borderWidth: 1, borderColor: '#7c3aed',  },
+  reservationBannerTextRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 2,
   },
   reservationBannerText: {
     color: '#c4b5fd', fontSize: 13, fontWeight: '600',
@@ -1119,6 +1148,11 @@ const pc = StyleSheet.create({
   header: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', marginBottom: 6,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   title:    { color: '#60a5fa', fontSize: 13, fontWeight: '700' },
   rateName: { color: '#475569', fontSize: 12 },
@@ -1140,13 +1174,18 @@ const pc = StyleSheet.create({
   estimateLoading: {
     flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8,
   },
-  estimateLoadingText: { color: '#475569', fontSize: 12 },
-  estimate: {
+  estimateLoadingText: { color: '#475569', fontSize: 12 },  estimate: {
     backgroundColor: '#1e293b', borderRadius: 8, padding: 10, marginTop: 8,
+  },
+  estimateTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 8,
   },
   estimateTitle: {
     color: '#64748b', fontSize: 11, fontWeight: '700',
-    marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5,
+    textTransform: 'uppercase', letterSpacing: 0.5,
   },
   estimateRow: {
     flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4,
@@ -1182,7 +1221,15 @@ const fs = StyleSheet.create({
     marginRight: 8, borderWidth: 1, borderColor: '#334155',
   },
   chipActive:     { backgroundColor: '#0c4a6e', borderColor: '#22d3ee' },
-  chipText:       { color: '#64748b', fontSize: 13 },
+  chipContent: {
+    flexDirection: 'row',
+    alignItems: 'center',    gap: 4,
+  },
+  chipText: {
+    color: '#64748b', fontSize: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   chipTextActive: { color: '#22d3ee', fontWeight: '600' },
   actions:  { flexDirection: 'row', gap: 12, marginTop: 8 },
   resetBtn: {
