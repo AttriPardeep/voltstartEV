@@ -16,7 +16,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.voltstartev.mobile",
       "config": {
-        "googleMapsApiKey": "AIzaSyA-VeWWicPO3BSvMhZVtAyAK887S87v0dM"
+        "googleMapsApiKey": "process.env.GOOGLE_MAPS_API_KEY"
       }
     },
     "android": {
