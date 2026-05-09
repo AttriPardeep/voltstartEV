@@ -3,7 +3,6 @@ import React, { useEffect, useRef } from 'react';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
-import { Text } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ThemeProvider } from './src/themes/ThemeContext';
 
@@ -23,6 +22,9 @@ import {
   savePushToken,
   setupNotificationListeners,
 } from './src/services/notifications';
+
+// ✅ Import icon system
+import { AppIcon, IconSize } from './src/components/icons';
 
 const Tab = createBottomTabNavigator();
 
@@ -46,7 +48,6 @@ export default function App() {
       disconnectWebSocket();
     };
   }, [token]);
-
   // ── Push notifications: register + handle taps ──
   useEffect(() => {
     if (!token) return;
@@ -95,56 +96,63 @@ export default function App() {
                 borderTopColor: '#1e293b',
               },
               tabBarActiveTintColor: '#22d3ee',
-              tabBarInactiveTintColor: '#475569',
-            }}
+              tabBarInactiveTintColor: '#475569',            }}
           >
+            {/* ✅ Map/Chargers tab - replaced 🗺️ with AppIcon.Location */}
             <Tab.Screen
               name="Map"
               component={MapScreen}
               options={{
                 title: 'Chargers',
-                tabBarIcon: ({ color }) => (
-                  <Text style={{ fontSize: 20, color }}>🗺️</Text>
+                tabBarIcon: ({ color, size }) => (
+                  <AppIcon.Location size={size ?? IconSize.md} color={color} />
                 ),
               }}
             />
+            
+            {/* ✅ Session tab - replaced ⚡ with AppIcon.Zap */}
             <Tab.Screen
               name="Session"
               component={SessionScreen}
               options={{
                 title: 'Session',
-                tabBarIcon: ({ color }) => (
-                  <Text style={{ fontSize: 20, color }}>⚡</Text>
+                tabBarIcon: ({ color, size }) => (
+                  <AppIcon.Zap size={size ?? IconSize.md} color={color} />
                 ),
               }}
             />
+            
+            {/* ✅ History tab - replaced 📋 with AppIcon.List */}
             <Tab.Screen
               name="History"
               component={HistoryScreen}
               options={{
                 title: 'History',
-                tabBarIcon: ({ color }) => (
-                  <Text style={{ fontSize: 20, color }}>📋</Text>
+                tabBarIcon: ({ color, size }) => (
+                  <AppIcon.List size={size ?? IconSize.md} color={color} />
                 ),
               }}
             />
+            
+            {/* ✅ Profile tab - replaced 👤 with AppIcon.User */}
             <Tab.Screen
               name="Profile"
               component={ProfileScreen}
               options={{
                 title: 'Profile',
-                tabBarIcon: ({ color }) => (
-                  <Text style={{ fontSize: 20, color }}>👤</Text>
+                tabBarIcon: ({ color, size }) => (
+                  <AppIcon.User size={size ?? IconSize.md} color={color} />
                 ),
               }}
             />
+                        {/* ✅ Wallet tab - replaced 💰 with AppIcon.Wallet */}
             <Tab.Screen
               name="Wallet"
               component={WalletScreen}
               options={{
                 title: 'Wallet',
-                tabBarIcon: ({ color }) => (
-                  <Text style={{ fontSize: 20, color }}>💰</Text>
+                tabBarIcon: ({ color, size }) => (
+                  <AppIcon.Wallet size={size ?? IconSize.md} color={color} />
                 ),
               }}
             />	
