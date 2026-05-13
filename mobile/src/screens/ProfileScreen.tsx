@@ -8,7 +8,8 @@ import { useAuthStore } from '../store/authStore';
 import { api } from '../utils/api';
 import FleetSection from '../components/FleetSection';
 import RFIDSection from '../components/RFIDSection';
-import { AppIcon } from '../components/icons';
+import TargetSocControl from '../components/TargetSocControl';
+import { AppIcon, IconColors, IconSize, IconBadge } from '../components/icons';
 
 // ─── Vehicle Database ─────────────────────────────────
 interface VehicleSpec {
@@ -45,8 +46,7 @@ export const VEHICLES_BY_BRAND: BrandVehicles = {
     { model: 'Dolphin', capacity: 44.9 },
     { model: 'Seal', capacity: 82.5 },
   ],
-  'BMW': [
-    { model: 'iX', capacity: 111.5 },
+  'BMW': [ { model: 'iX', capacity: 111.5 },
     { model: 'i4', capacity: 83.9 },
     { model: 'iX3', capacity: 80.0 },
   ],
@@ -82,6 +82,8 @@ export const VEHICLES_BY_BRAND: BrandVehicles = {
   ],
 };
 
+//console.disableYellowBox = false;
+
 // ─── Types ────────────────────────────────────────────
 interface UserVehicle {
   id: number;
@@ -94,10 +96,8 @@ interface UserVehicle {
   is_primary: number;
 }
 
-// Fleet types
 interface UserFleet {
-  fleet_id: number;
-  fleet_name: string;
+  fleet_id: number; fleet_name: string;
   role: 'admin' | 'driver';
   billing_mode: 'fleet_pays' | 'driver_pays';
   monthly_limit?: number | null;
@@ -146,8 +146,7 @@ function VehicleModal({
   const handleSave = async () => {
     if (!selectedBrand || !selectedModel) {
       Alert.alert('Required', 'Please select a brand and model');
-      return;
-    }
+      return; }
     if (!batteryKwh || isNaN(parseFloat(batteryKwh))) {
       Alert.alert('Required', 'Please enter battery capacity');
       return;
@@ -181,25 +180,22 @@ function VehicleModal({
               {initial ? 'Edit Vehicle' : 'Add Vehicle'}
             </Text>
             <TouchableOpacity onPress={onClose}>
-              <Text style={m.close}>✕</Text>
+              <AppIcon.Close size={22} color={IconColors.muted} />
             </TouchableOpacity>
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false}>
-            {/* Nickname */}
             <Text style={m.label}>Nickname (optional)</Text>
             <TextInput style={m.input} value={nickname}
               onChangeText={setNickname}
-              placeholder="e.g. My MG, Office Car"
+              placeholder="e.g. My Nexon, Office Car"
               placeholderTextColor="#475569" />
 
-            {/* Brand selector */}
             <Text style={m.label}>Brand</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}
               style={m.scroll}>
               {Object.keys(VEHICLES_BY_BRAND).map(brand => (
-                <TouchableOpacity key={brand}
-                  style={[m.chip, selectedBrand === brand && m.chipActive]}
+                <TouchableOpacity key={brand} style={[m.chip, selectedBrand === brand && m.chipActive]}
                   onPress={() => {
                     setSelectedBrand(brand);
                     setSelectedModel('');
@@ -214,7 +210,6 @@ function VehicleModal({
               ))}
             </ScrollView>
 
-            {/* Model selector */}
             {selectedBrand && (
               <>
                 <Text style={m.label}>Model</Text>
@@ -233,7 +228,7 @@ function VehicleModal({
                         </Text>
                       </View>
                       {selectedModel === spec.model && (
-                        <Text style={m.tick}>✓</Text>
+                        <AppIcon.Success size={18} color={IconColors.primary} />
                       )}
                     </TouchableOpacity>
                   ))}
@@ -241,7 +236,6 @@ function VehicleModal({
               </>
             )}
 
-            {/* Variant selector */}
             {variants.length > 0 && selectedModel && (
               <>
                 <Text style={m.label}>Variant</Text>
@@ -250,8 +244,7 @@ function VehicleModal({
                   {variants.map(v => (
                     <TouchableOpacity key={v.name}
                       style={[m.chip,
-                        selectedVariant === v.name && m.chipActive]}
-                      onPress={() => handleSelectVariant(v)}>
+                        selectedVariant === v.name && m.chipActive]} onPress={() => handleSelectVariant(v)}>
                       <Text style={[m.chipText,
                         selectedVariant === v.name && m.chipTextActive]}>
                         {v.name} · {v.capacity} kWh
@@ -262,7 +255,6 @@ function VehicleModal({
               </>
             )}
 
-            {/* Battery capacity */}
             <Text style={m.label}>Battery Capacity (kWh)</Text>
             <TextInput style={m.input} value={batteryKwh}
               onChangeText={setBatteryKwh}
@@ -270,7 +262,6 @@ function VehicleModal({
               placeholderTextColor="#475569"
               keyboardType="decimal-pad" />
 
-            {/* Target SOC */}
             <Text style={m.label}>Target Charge %</Text>
             <View style={m.socRow}>
               {[60, 70, 80, 90, 100].map(pct => (
@@ -286,26 +277,23 @@ function VehicleModal({
               ))}
             </View>
 
-            {/* Primary toggle */}
             <TouchableOpacity style={m.primaryRow}
               onPress={() => setIsPrimary(!isPrimary)}>
               <View style={[m.checkbox, isPrimary && m.checkboxActive]}>
-                {isPrimary && <Text style={m.checkboxTick}>✓</Text>}
+                {isPrimary && <AppIcon.Success size={14} color="#0f172a" />}
               </View>
               <Text style={m.primaryText}>
                 Set as primary vehicle (used for charging estimates)
               </Text>
             </TouchableOpacity>
 
-            {/* Save */}
             <TouchableOpacity style={m.saveBtn}
               onPress={handleSave} disabled={saving}>
               {saving
                 ? <ActivityIndicator color="#0f172a" />
                 : <Text style={m.saveBtnText}>
                     {initial ? 'Update Vehicle' : 'Add Vehicle'}
-                  </Text>
-              }
+                  </Text> }
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -322,13 +310,15 @@ export default function ProfileScreen({ navigation }: any) {
   const [showModal, setShowModal] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<UserVehicle | null>(null);
   
-  // Fleet state
   const [userFleet, setUserFleet] = useState<UserFleet | null>(null);
   const [fleetLoading, setFleetLoading] = useState(false);
+  const [vehicleRefreshKey, setVehicleRefreshKey] = useState(0);
 
   const fetchVehicles = useCallback(async () => {
     try {
+      setLoading(true);
       const res = await api.get('/api/users/me/vehicles');
+      console.log('Vehicles API:', res.data);
       setVehicles(res.data.data || []);
     } catch (err) {
       console.warn('Failed to fetch vehicles:', err);
@@ -336,33 +326,16 @@ export default function ProfileScreen({ navigation }: any) {
       setLoading(false);
     }
   }, []);
-
-  // Fetch fleet info
-  const fetchFleetInfo = useCallback(async () => {
-    try {
-      setFleetLoading(true);
-      const res = await api.get('/api/fleet/me');
-      if (res.data.success && res.data.data) {
-        setUserFleet(res.data.data);
-      }
-    } catch (err) {
-      // Not in a fleet is OK — just don't show fleet section
-      setUserFleet(null);
-    } finally {
-      setFleetLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { 
+  
+  useEffect(() => {
     fetchVehicles();
-    fetchFleetInfo(); 
-  }, []);
-
+  }, [fetchVehicles]);
+  
   const handleAdd = async (data: any) => {
     await api.post('/api/users/me/vehicles', data);
     await fetchVehicles();
   };
-
+  
   const handleEdit = async (data: any) => {
     await api.put(`/api/users/me/vehicles/${editingVehicle!.id}`, data);
     await fetchVehicles();
@@ -397,10 +370,9 @@ export default function ProfileScreen({ navigation }: any) {
     ]);
   };
 
-  const primaryVehicle = vehicles.find(v => v.is_primary === 1) || vehicles[0];
   return (
     <ScrollView style={s.container} contentContainerStyle={s.content}>
-      {/* Avatar */}
+      {/* Avatar & User Info */}
       <View style={s.avatar}>
         <Text style={s.avatarText}>
           {user?.username?.[0]?.toUpperCase() || '?'}
@@ -408,15 +380,14 @@ export default function ProfileScreen({ navigation }: any) {
       </View>
       <Text style={s.name}>{user?.username || 'User'}</Text>
       <Text style={s.email}>{user?.email || ''}</Text>
-
       {/* Account Info */}
       <View style={s.card}>
         <InfoRow label="Account ID" value={user?.userId?.toString() || '—'} />
         <InfoRow label="OCPP Tag" value={user?.idTag || '—'} />
         <InfoRow label="Plan" value="Standard" />
       </View>
-	  
-      {/* RFID section — pass callback to refresh profile when tags change */}
+   
+      {/* RFID section */}
       <RFIDSection />
       
       {/* Fleet Section */}
@@ -424,7 +395,7 @@ export default function ProfileScreen({ navigation }: any) {
         <>
           <View style={s.sectionHeader}>
             <View style={s.sectionTitleRow}>
-              <AppIcon.Van size={20} />
+              <AppIcon.FleetBuilding size={20} color={IconColors.primary} />
               <Text style={s.sectionTitle}>Fleet</Text>
             </View>
           </View>
@@ -434,20 +405,16 @@ export default function ProfileScreen({ navigation }: any) {
             onPress={() => navigation.navigate('FleetDashboard', { fleetId: userFleet.fleet_id })}
           >
             <View style={s.fleetHeader}>
-              <View style={s.sectionTitleRow}>
-                <AppIcon.Van size={20} />
-                <Text style={s.sectionTitle}>Fleet</Text>
-              </View>
-              <View style={{ flex: 1 }}>
+              <AppIcon.Building size={24} color={userFleet.role === 'admin' ? IconColors.primary : IconColors.muted} />
+              <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={s.fleetName}>{userFleet.fleet_name}</Text>
                 <Text style={s.fleetRole}>
                   {userFleet.role === 'admin' ? 'Admin' : 'Driver'} • {userFleet.billing_mode === 'fleet_pays' ? 'Company Pays' : 'You Pay'}
                 </Text>
               </View>
-              <Text style={s.fleetArrow}>›</Text>
+              <AppIcon.ChevronRight size={20} color={IconColors.muted} />
             </View>
             
-            {/* Quick stats */}
             {userFleet.monthly_limit && (
               <View style={s.fleetStats}>
                 <Text style={s.statLabel}>Monthly Limit</Text>
@@ -460,20 +427,23 @@ export default function ProfileScreen({ navigation }: any) {
 
       {/* Vehicles Section */}
       <View style={s.sectionHeader}>
-        <Text style={s.sectionTitle}><AppIcon.Car /> My Vehicles</Text>
+        <View style={s.sectionTitleRow}>
+          <AppIcon.Car size={20} color={IconColors.primary} />
+          <Text style={s.sectionTitle}>My Vehicles</Text></View>
         <TouchableOpacity style={s.addBtn}
           onPress={() => { setEditingVehicle(null); setShowModal(true); }}>
-          <Text style={s.addBtnText}>+ Add</Text>
+          <AppIcon.Plus size={IconSize.sm} color="#0f172a" />
+          <Text style={s.addBtnText}>Add</Text>
         </TouchableOpacity>
       </View>
 
       {loading ? (
-        <ActivityIndicator color="#22d3ee" style={{ marginVertical: 20 }} />
+        <ActivityIndicator color={IconColors.primary} style={{ marginVertical: 20 }} />
       ) : vehicles.length === 0 ? (
         <TouchableOpacity style={s.emptyCard}
           onPress={() => { setEditingVehicle(null); setShowModal(true); }}>
           <View style={s.emptyIcon}>
-            <AppIcon.Car size={40} color="#64748b" />
+            <AppIcon.Car size={36} color={IconColors.muted} />
           </View>
           <Text style={s.emptyTitle}>No vehicles added</Text>
           <Text style={s.emptySub}>
@@ -484,82 +454,143 @@ export default function ProfileScreen({ navigation }: any) {
           </View>
         </TouchableOpacity>
       ) : (
-        vehicles.map(vehicle => (
-          <View key={vehicle.id} style={[s.vehicleCard,
-            vehicle.is_primary === 1 && s.vehicleCardPrimary]}>
-            {/* Primary badge */}
-            {vehicle.is_primary === 1 && (
-              <View style={s.primaryBadge}>
-                <Text style={s.primaryBadgeText}>⭐ Primary</Text>
-              </View>
-            )}
+        <>
+          {vehicles.map(vehicle => (
+            <View key={vehicle.id}>
+              <View
+                style={[
+                  s.vehicleCard,
+                  vehicle.is_primary === 1 && s.vehicleCardPrimary
+                ]}
+              >
 
-            {/* Vehicle info */}
-            <View style={s.vehicleHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.vehicleName}>
-                  {vehicle.nickname
-                    ? vehicle.nickname
-                    : `${vehicle.brand} ${vehicle.model}`}
-                </Text>
-                {vehicle.nickname && (
-                  <Text style={s.vehicleSubName}>
-                    {vehicle.brand} {vehicle.model}
-                    {vehicle.variant ? ` · ${vehicle.variant}` : ''}
-                  </Text>
+                {vehicle.is_primary === 1 && (
+                  <IconBadge
+                    icon={AppIcon.Star}
+                    label="Primary"
+                    color={IconColors.primary}
+                    background="#0C4A6E"
+                    size={IconSize.xs}
+                  />
                 )}
-              </View>
-              <Text style={s.vehicleBattery}>
-                {vehicle.battery_kwh} kWh
-              </Text>
-            </View>
 
-            <View style={s.vehicleStats}>
-              <View style={s.vehicleStatRow}>
-                <AppIcon.Target size={18} color="#94a3b8" />
-                <Text style={s.vehicleStat}>Target: {vehicle.target_soc}%</Text>
-              </View>
-              <View style={s.vehicleStatRow}>
-                <AppIcon.BatteryCharging size={20} color="#94a3b8" />
-                <Text style={s.vehicleStat}>{vehicle.battery_kwh} kWh</Text>
-              </View>
-            </View>
+                <View style={s.vehicleHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.vehicleName}>
+                      {vehicle.nickname
+                        ? vehicle.nickname
+                        : `${vehicle.brand} ${vehicle.model}`}
+                    </Text>
 
-            {/* Actions */}
-            <View style={s.vehicleActions}>
-              {vehicle.is_primary !== 1 && (
-                <TouchableOpacity style={s.actionBtn}
-                  onPress={() => handleSetPrimary(vehicle)}>
-                  <Text style={s.actionBtnText}>Set Primary</Text>
-                </TouchableOpacity>
+                    {vehicle.nickname && (
+                      <Text style={s.vehicleSubName}>
+                        {vehicle.brand} {vehicle.model}
+                        {vehicle.variant
+                          ? ` · ${vehicle.variant}`
+                          : ''}
+                      </Text>
+                    )}
+                  </View>
+
+                  <Text style={s.vehicleBattery}>
+                    {vehicle.battery_kwh} kWh
+                  </Text>
+                </View>
+
+                <View style={s.vehicleStats}>
+                  <View style={s.vehicleStatRow}>
+                    <AppIcon.Target
+                      size={14}
+                      color={IconColors.warning}
+                    />
+                    <Text style={s.vehicleStat}>
+                      Target: {vehicle.target_soc}%
+                    </Text>
+                  </View>
+
+                  <View style={s.vehicleStatRow}>
+                    <AppIcon.BatteryCharging
+                      size={14}
+                      color={IconColors.primary}
+                    />
+                    <Text style={s.vehicleStat}>
+                      {vehicle.battery_kwh} kWh
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={s.vehicleActions}>
+                  {vehicle.is_primary !== 1 && (
+                    <TouchableOpacity
+                      style={s.actionBtn}
+                      onPress={() => handleSetPrimary(vehicle)}
+                    >
+                      <Text style={s.actionBtnText}>
+                        Set Primary
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  <TouchableOpacity
+                    style={s.actionBtn}
+                    onPress={() => {
+                      setEditingVehicle(vehicle);
+                      setShowModal(true);
+                    }}
+                  >
+                    <Text style={s.actionBtnText}>Edit</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[s.actionBtn, s.actionBtnDanger]}
+                    onPress={() => handleDelete(vehicle)}
+                  >
+                    <AppIcon.Delete
+                      size={14}
+                      color={IconColors.error}
+                    />
+                    <Text style={s.actionBtnDangerText}>
+                      Remove
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {vehicle.is_primary === 1 && (
+                <TargetSocControl
+                  vehicleId={vehicle.id}
+                  currentSoc={vehicle.target_soc ?? 80}
+                  vehicleName={`${vehicle.brand} ${vehicle.model}`}
+                  onUpdated={(newSoc) => {
+                    setVehicles(prev =>
+                      prev.map(v =>
+                        v.id === vehicle.id
+                          ? { ...v, target_soc: newSoc }
+                          : v
+                      )
+                    );
+
+                    useAuthStore.getState().updateUser({
+                      targetSocPercent: newSoc
+                    });
+                  }}
+                />
               )}
-              <TouchableOpacity style={s.actionBtn}
-                onPress={() => {
-                  setEditingVehicle(vehicle);
-                  setShowModal(true);
-                }}>
-                <Text style={s.actionBtnText}>Edit</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[s.actionBtn, s.actionBtnDanger]}
-                onPress={() => handleDelete(vehicle)}>
-                <Text style={s.actionBtnDangerText}>Remove</Text>
-              </TouchableOpacity>
             </View>
-          </View>
-        ))
+          ))}
+        </>
       )}
-
-     {/* ── Fleet Management — only visible to fleet_admin ── */}
+      {/* Fleet Management — only visible to fleet_admin */}
       {user?.role === 'fleet_admin' && (
         <FleetSection userId={user.userId} />
       )}
-	  
+   
       {/* Logout */}
       <TouchableOpacity style={s.logoutBtn} onPress={handleLogout}>
+        <AppIcon.LogOut size={20} color="#fca5a5" />
         <Text style={s.logoutText}>Logout</Text>
       </TouchableOpacity>
 
-      {/* Add/Edit Modal */}
       <VehicleModal
         visible={showModal}
         onClose={() => setShowModal(false)}
@@ -581,26 +612,11 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 // ─── Styles ───────────────────────────────────────────
 const s = StyleSheet.create({
-  sectionTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  emptyIcon: {
-    marginBottom: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  vehicleStatRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
   container: { flex: 1, backgroundColor: '#0f172a' },
   content: { padding: 20, paddingBottom: 40 },
   avatar: {
     width: 80, height: 80, borderRadius: 40,
-    backgroundColor: '#22d3ee', alignItems: 'center',
+    backgroundColor: IconColors.primary, alignItems: 'center',
     justifyContent: 'center', alignSelf: 'center',
     marginTop: 20, marginBottom: 12,
   },
@@ -615,11 +631,21 @@ const s = StyleSheet.create({
     paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#334155' },
   rowLabel: { color: '#64748b', fontSize: 14 },
   rowValue: { color: '#e2e8f0', fontSize: 14, fontWeight: '600' },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 12 },
+    sectionHeader: { 
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', marginBottom: 12, marginTop: 8 
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   sectionTitle: { color: '#f1f5f9', fontSize: 17, fontWeight: '700' },
-  addBtn: { backgroundColor: '#22d3ee', borderRadius: 20,
-    paddingHorizontal: 16, paddingVertical: 6 },
+  addBtn: { 
+    backgroundColor: IconColors.primary, borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 6,
+    flexDirection: 'row', alignItems: 'center', gap: 4
+  },
   addBtnText: { color: '#0f172a', fontWeight: '700', fontSize: 13 },
   
   // Fleet styles
@@ -632,17 +658,13 @@ const s = StyleSheet.create({
     borderColor: '#334155',
   },
   fleetCardAdmin: {
-    borderColor: '#22d3ee',
+    borderColor: IconColors.primary,
     backgroundColor: '#0c4a6e',
   },
   fleetHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
-  },
-  fleetIcon: {
-    fontSize: 24,
-    marginRight: 12,
   },
   fleetName: {
     color: '#f1f5f9',
@@ -653,72 +675,62 @@ const s = StyleSheet.create({
     color: '#64748b',
     fontSize: 13,
   },
-  fleetArrow: {
-    color: '#64748b',
-    fontSize: 20,
-  },
   fleetStats: {
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: 8,
     marginTop: 4,
-  },
-  statLabel: {
-    color: '#64748b',
-    fontSize: 12,
-  },
-  statValue: {
-    color: '#22d3ee',
-    fontSize: 14,
-    fontWeight: '700',
-  },
+  }, statLabel: { color: '#64748b', fontSize: 12 },
+  statValue: { color: IconColors.primary, fontSize: 14, fontWeight: '700' },
   
   emptyCard: { backgroundColor: '#1e293b', borderRadius: 14,
     padding: 28, alignItems: 'center', marginBottom: 16,
     borderWidth: 2, borderColor: '#334155', borderStyle: 'dashed' },
-  emptyTitle: { color: '#e2e8f0', fontSize: 16, fontWeight: '700',
-    marginBottom: 6 },
-  emptySub: { color: '#64748b', fontSize: 13, textAlign: 'center',
-    marginBottom: 16 },
-  emptyAddBtn: { backgroundColor: '#22d3ee', borderRadius: 10,
+  emptyIcon: { marginBottom: 10, alignItems: 'center', justifyContent: 'center' },
+  emptyTitle: { color: '#e2e8f0', fontSize: 16, fontWeight: '700', marginBottom: 6 },
+  emptySub: { color: '#64748b', fontSize: 13, textAlign: 'center', marginBottom: 16 },
+  emptyAddBtn: { backgroundColor: IconColors.primary, borderRadius: 10,
     paddingHorizontal: 24, paddingVertical: 10 },
   emptyAddTxt: { color: '#0f172a', fontWeight: '700' },
+  
   vehicleCard: { backgroundColor: '#1e293b', borderRadius: 14,
     padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#334155' },
-  vehicleCardPrimary: { borderColor: '#22d3ee' },
-  primaryBadge: { backgroundColor: '#0c4a6e', borderRadius: 20,
-    paddingHorizontal: 10, paddingVertical: 3,
-    alignSelf: 'flex-start', marginBottom: 10 },
-  primaryBadgeText: { color: '#22d3ee', fontSize: 11, fontWeight: '700' },
-  vehicleHeader: { flexDirection: 'row', alignItems: 'flex-start',
-    marginBottom: 8 },
+  vehicleCardPrimary: { borderColor: IconColors.primary },
+  
+  vehicleHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 },
   vehicleName: { color: '#f1f5f9', fontSize: 16, fontWeight: '700' },
   vehicleSubName: { color: '#64748b', fontSize: 12, marginTop: 2 },
-  vehicleBattery: { color: '#22d3ee', fontSize: 16, fontWeight: '800' },
+  vehicleBattery: { color: IconColors.primary, fontSize: 16, fontWeight: '800' },
+  
   vehicleStats: { flexDirection: 'row', gap: 16, marginBottom: 12 },
+  vehicleStatRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   vehicleStat: { color: '#94a3b8', fontSize: 13 },
+  
   vehicleActions: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  actionBtn: { backgroundColor: '#0f172a', borderRadius: 8,
+  actionBtn: { 
+    backgroundColor: '#0f172a', borderRadius: 8,
     paddingHorizontal: 12, paddingVertical: 6,
-    borderWidth: 1, borderColor: '#334155' },
+    borderWidth: 1, borderColor: '#334155',
+    flexDirection: 'row', alignItems: 'center', gap: 4
+  },
   actionBtnText: { color: '#94a3b8', fontSize: 12 },
   actionBtnDanger: { borderColor: '#7f1d1d' },
   actionBtnDangerText: { color: '#fca5a5', fontSize: 12 },
-  logoutBtn: { backgroundColor: '#7f1d1d', borderRadius: 12,
-    padding: 14, alignItems: 'center', marginTop: 8 },
+  
+  logoutBtn: { 
+    backgroundColor: '#7f1d1d', borderRadius: 12,
+    padding: 14, alignItems: 'center', marginTop: 8,
+    flexDirection: 'row', justifyContent: 'center', gap: 8
+  },
   logoutText: { color: '#fca5a5', fontWeight: '700', fontSize: 16 },
 });
 
 const m = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: '#00000088',
-    justifyContent: 'flex-end' },
+  overlay: { flex: 1, backgroundColor: '#00000088', justifyContent: 'flex-end' },
   sheet: { backgroundColor: '#1e293b', borderTopLeftRadius: 24,
-    borderTopRightRadius: 24, padding: 24, paddingBottom: 40,
-    maxHeight: '92%' },
-  header: { flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 20 },
+    borderTopRightRadius: 24, padding: 24, paddingBottom: 40, maxHeight: '92%' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   title: { color: '#f1f5f9', fontSize: 18, fontWeight: '800' },
-  close: { color: '#64748b', fontSize: 22, padding: 4 },
   label: { color: '#64748b', fontSize: 11, fontWeight: '600',
     textTransform: 'uppercase', letterSpacing: 0.5,
     marginBottom: 8, marginTop: 16 },
@@ -729,9 +741,9 @@ const m = StyleSheet.create({
   chip: { backgroundColor: '#0f172a', borderRadius: 20,
     paddingHorizontal: 14, paddingVertical: 8, marginRight: 8,
     borderWidth: 1, borderColor: '#334155' },
-  chipActive: { backgroundColor: '#0c4a6e', borderColor: '#22d3ee' },
+  chipActive: { backgroundColor: '#0c4a6e', borderColor: IconColors.primary },
   chipText: { color: '#64748b', fontSize: 13 },
-  chipTextActive: { color: '#22d3ee', fontWeight: '600' },
+  chipTextActive: { color: IconColors.primary, fontWeight: '600' },
   modelList: { backgroundColor: '#0f172a', borderRadius: 10,
     borderWidth: 1, borderColor: '#334155', marginBottom: 4 },
   modelItem: { flexDirection: 'row', alignItems: 'center',
@@ -739,23 +751,21 @@ const m = StyleSheet.create({
   modelItemActive: { backgroundColor: '#0c4a6e' },
   modelName: { color: '#f1f5f9', fontSize: 14, fontWeight: '600' },
   modelSub: { color: '#64748b', fontSize: 12, marginTop: 2 },
-  tick: { color: '#22d3ee', fontSize: 18, fontWeight: '800' },
   socRow: { flexDirection: 'row', gap: 8 },
   socBtn: { flex: 1, backgroundColor: '#0f172a', borderRadius: 8,
     padding: 10, alignItems: 'center',
     borderWidth: 1, borderColor: '#334155' },
-  socBtnActive: { backgroundColor: '#0c4a6e', borderColor: '#22d3ee' },
+  socBtnActive: { backgroundColor: '#0c4a6e', borderColor: IconColors.primary },
   socText: { color: '#64748b', fontSize: 13, fontWeight: '600' },
-  socTextActive: { color: '#22d3ee' },
+  socTextActive: { color: IconColors.primary },
   primaryRow: { flexDirection: 'row', alignItems: 'center',
     gap: 10, marginTop: 16, marginBottom: 4 },
   checkbox: { width: 22, height: 22, borderRadius: 4,
     borderWidth: 2, borderColor: '#334155',
     alignItems: 'center', justifyContent: 'center' },
-  checkboxActive: { backgroundColor: '#22d3ee', borderColor: '#22d3ee' },
-  checkboxTick: { color: '#0f172a', fontSize: 14, fontWeight: '800' },
+  checkboxActive: { backgroundColor: IconColors.primary, borderColor: IconColors.primary },
   primaryText: { color: '#94a3b8', fontSize: 13, flex: 1 },
-  saveBtn: { backgroundColor: '#22d3ee', borderRadius: 12,
+  saveBtn: { backgroundColor: IconColors.primary, borderRadius: 12,
     padding: 16, alignItems: 'center', marginTop: 20 },
   saveBtnText: { color: '#0f172a', fontWeight: '800', fontSize: 15 },
 });

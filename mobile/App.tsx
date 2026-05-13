@@ -22,10 +22,22 @@ import {
   savePushToken,
   setupNotificationListeners,
 } from './src/services/notifications';
-
-// ✅ Import icon system
 import { AppIcon, IconSize } from './src/components/icons';
+/*
+import { LogBox } from 'react-native';
+LogBox.ignoreLogs([]);
+const originalError = console.error;
 
+console.error = (...args) => {
+  if (
+    typeof args[0] === 'string' &&
+    args[0].includes('Text strings must be rendered within a <Text> component')
+  ) {
+    debugger;
+  }
+  originalError(...args);
+};
+*/
 const Tab = createBottomTabNavigator();
 
 export default function App() {
@@ -98,7 +110,7 @@ export default function App() {
               tabBarActiveTintColor: '#22d3ee',
               tabBarInactiveTintColor: '#475569',            }}
           >
-            {/* ✅ Map/Chargers tab - replaced 🗺️ with AppIcon.Location */}
+            {/*  */}
             <Tab.Screen
               name="Map"
               component={MapScreen}
@@ -110,7 +122,7 @@ export default function App() {
               }}
             />
             
-            {/* ✅ Session tab - replaced ⚡ with AppIcon.Zap */}
+            {/*  */}
             <Tab.Screen
               name="Session"
               component={SessionScreen}
@@ -122,7 +134,7 @@ export default function App() {
               }}
             />
             
-            {/* ✅ History tab - replaced 📋 with AppIcon.List */}
+            {/*  */}
             <Tab.Screen
               name="History"
               component={HistoryScreen}
@@ -133,8 +145,18 @@ export default function App() {
                 ),
               }}
             />
-            
-            {/* ✅ Profile tab - replaced 👤 with AppIcon.User */}
+            {/*  */}
+            <Tab.Screen
+              name="Wallet"
+              component={WalletScreen}
+              options={{
+                title: 'Wallet',
+                tabBarIcon: ({ color, size }) => (
+                  <AppIcon.Wallet size={size ?? IconSize.md} color={color} />
+                ),
+              }}
+            />	            
+            {/*  */}
             <Tab.Screen
               name="Profile"
               component={ProfileScreen}
@@ -145,17 +167,6 @@ export default function App() {
                 ),
               }}
             />
-                        {/* ✅ Wallet tab - replaced 💰 with AppIcon.Wallet */}
-            <Tab.Screen
-              name="Wallet"
-              component={WalletScreen}
-              options={{
-                title: 'Wallet',
-                tabBarIcon: ({ color, size }) => (
-                  <AppIcon.Wallet size={size ?? IconSize.md} color={color} />
-                ),
-              }}
-            />	
           </Tab.Navigator>
           
           {/* FleetDashboard as a Stack screen */}

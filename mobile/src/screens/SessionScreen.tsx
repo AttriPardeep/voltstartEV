@@ -12,7 +12,14 @@ import { useSessionStore } from '../store/sessionStore';
 import { useAuthStore } from '../store/authStore';
 import { socket } from '../utils/socket';
 import { useNavigation } from '@react-navigation/native';
-import { AppIcon, IconColors, IconSize } from '../components/icons';
+
+//  Import dynamic icons + static icon system
+import { 
+  AppIcon, IconColors, IconSize, 
+  DynamicBatteryIcon, DynamicPowerIcon, 
+  DynamicConnectivityIcon, DynamicCostIcon,
+  IconBadge 
+} from '../components/icons';
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -40,8 +47,7 @@ function parseSessionTime(raw: string | null | undefined): number | null {
   if (!raw) return null;
   const iso = raw.includes('T') ? raw : raw.replace(' ', 'T') + 'Z';
   const t = new Date(iso).getTime();
-  return isNaN(t) ? null : t;
-}
+  return isNaN(t) ? null : t;}
 
 interface SessionSummary {
   chargeBoxId: string;
@@ -53,45 +59,44 @@ interface SessionSummary {
   endSoc?: number;
 }
 
-// ─── Stat Row (Updated to use Icon Components) ─────────
+// ─── Stat Row (Updated for Dynamic Icons) ─────────────────────────────────
 const StatRow = React.memo(({ left, right, theme }: {
   left: { 
-    icon: React.FC<{ size?: number; color?: string }>; 
+    icon: React.ReactNode; 
     label: string; 
     value: string; 
-    color: string 
+    color?: string;
   };
   right?: { 
-    icon: React.FC<{ size?: number; color?: string }>; 
+    icon: React.ReactNode; 
     label: string; 
     value: string; 
-    color: string 
+    color?: string;
   };
   theme: any;
 }) => (
   <View style={[stat.row, { borderBottomColor: theme.border }]}>
     <View style={stat.cell}>
-      <left.icon size={IconSize.md} color={left.color} />
+      {left.icon}
       <View>
         <Text style={[stat.label, { color: theme.textMuted }]}>{left.label}</Text>
-        <Text style={[stat.value, { color: left.color }]}>{left.value}</Text>
+        <Text style={[stat.value, { color: left.color || theme.text }]}>{left.value}</Text>
       </View>
     </View>
     {right && (
       <View style={[stat.cell, stat.right, { borderLeftColor: theme.border }]}>
-        <right.icon size={IconSize.md} color={right.color} />
+        {right.icon}
         <View>
           <Text style={[stat.label, { color: theme.textMuted }]}>{right.label}</Text>
-          <Text style={[stat.value, { color: right.color }]}>{right.value}</Text>
+          <Text style={[stat.value, { color: right.color || theme.text }]}>{right.value}</Text>
         </View>
       </View>
     )}
   </View>
 ));
 
-// ─── Charging Efficiency Card ──
-function ChargingEfficiencyCard({ summary, user, theme }: { 
-  summary: SessionSummary; 
+// ─── NEW: Charging Efficiency Card (With Dynamic Efficiency Icon) ─────────────────────
+function ChargingEfficiencyCard({ summary, user, theme }: { summary: SessionSummary; 
   user: any;
   theme: any;
 }) {
@@ -112,31 +117,23 @@ function ChargingEfficiencyCard({ summary, user, theme }: {
   const lossPercent = actualKwh > 0 
     ? (lossKwh / actualKwh) * 100 : 0;
 
-  // Efficiency rating with icon/color 
-  const rating = efficiencyPct >= 95 
-    ? { label: 'Excellent', color: IconColors.success, Icon: AppIcon.Success }
-    : efficiencyPct >= 88 
-      ? { label: 'Good', color: IconColors.primary, Icon: AppIcon.Success }
-      : efficiencyPct >= 80 
-        ? { label: 'Normal', color: IconColors.warning, Icon: AppIcon.Info }
-        : { label: 'High Loss', color: IconColors.error, Icon: AppIcon.Warning };
-
   return (
-    <View style={[eff.card, { backgroundColor: theme.card, borderColor: theme.border, borderLeftColor: rating.color }]}>
+    <View style={[eff.card, { backgroundColor: theme.card, borderColor: theme.border, borderLeftColor: IconColors.success }]}>
       <View style={eff.titleRow}>
-        <AppIcon.Gauge size={IconSize.md} color={rating.color} />
+        {/*  Dynamic efficiency icon */}
+        <DynamicEfficiencyIcon efficiencyPct={efficiencyPct} size={IconSize.md} />
         <Text style={[eff.title, { color: theme.text }]}>Charging Efficiency</Text>
       </View>
       
       {/* Main efficiency display */}
       <View style={eff.effRow}>
-        <Text style={[eff.effPct, { color: rating.color }]}>
+        <Text style={[eff.effPct, { color: efficiencyPct >= 95 ? IconColors.success : efficiencyPct >= 88 ? IconColors.primary : efficiencyPct >= 80 ? IconColors.warning : IconColors.error }]}>
           {efficiencyPct.toFixed(1)}%
         </Text>
-        <View style={[eff.badge, { backgroundColor: rating.color + '22' }]}>
-          <rating.Icon size={IconSize.xs} color={rating.color} />
-          <Text style={{ color: rating.color, fontSize: 13, fontWeight: '700' }}>
-            {rating.label}
+        <View style={[eff.badge, { backgroundColor: (efficiencyPct >= 95 ? IconColors.success : efficiencyPct >= 88 ? IconColors.primary : efficiencyPct >= 80 ? IconColors.warning : IconColors.error) + '22' }]}>
+          <DynamicEfficiencyIcon efficiencyPct={efficiencyPct} size={IconSize.xs} />
+          <Text style={{ color: efficiencyPct >= 95 ? IconColors.success : efficiencyPct >= 88 ? IconColors.primary : efficiencyPct >= 80 ? IconColors.warning : IconColors.error, fontSize: 13, fontWeight: '700' }}>
+            {efficiencyPct >= 95 ? 'Excellent' : efficiencyPct >= 88 ? 'Good' : efficiencyPct >= 80 ? 'Normal' : 'High Loss'}
           </Text>
         </View>
       </View>
@@ -145,10 +142,9 @@ function ChargingEfficiencyCard({ summary, user, theme }: {
       <View style={[eff.progressBg, { backgroundColor: theme.border }]}>
         <View style={[eff.progressFill, { 
           width: `${Math.min(100, efficiencyPct)}%`,
-          backgroundColor: rating.color 
+          backgroundColor: efficiencyPct >= 95 ? IconColors.success : efficiencyPct >= 88 ? IconColors.primary : efficiencyPct >= 80 ? IconColors.warning : IconColors.error
         }]} />
       </View>
-
       {/* Energy breakdown grid */}
       <View style={eff.breakdown}>
         <View style={[eff.breakdownItem, { backgroundColor: theme.bgSecondary }]}>
@@ -198,8 +194,7 @@ function ChargingEfficiencyCard({ summary, user, theme }: {
 
 // ─── Main Screen ──────────────────────────────────────
 export default function SessionScreen() {
-  const { theme, outdoorMode, toggleOutdoorMode, brightnessLevel } = useTheme();
-  const { activeSession, telemetry, fetchActiveSession, stopSession, isLoading } = useSessionStore();
+  const { theme, outdoorMode, toggleOutdoorMode, brightnessLevel } = useTheme(); const { activeSession, telemetry, fetchActiveSession, stopSession, isLoading, wsConnected, lastTelemetryAt } = useSessionStore();
   const user = useAuthStore(s => s.user);
 
   const [elapsed, setElapsed] = useState(0);
@@ -248,8 +243,7 @@ export default function SessionScreen() {
 
   // Animated progress bar
   const targetSoc = user?.targetSocPercent || 80;
-  const currentSoc = telemetry?.socPercent;
-  const progressPct = currentSoc != null
+  const currentSoc = telemetry?.socPercent; const progressPct = currentSoc != null
     ? Math.min((currentSoc / targetSoc) * 100, 100) : 0;
 
   useEffect(() => {
@@ -262,12 +256,13 @@ export default function SessionScreen() {
   
   const navigation = useNavigation();
   
-  // Balance critical alert 
+  //  Balance critical alert ()
   useEffect(() => {
     const handleBalanceCritical = (event: any) => {
       const payload = event?.data || {};
       const balance = Number(payload.currentBalance ?? 0);
       const cost = Number(payload.costSoFar ?? 0);
+      
       Alert.alert(
         'Wallet Balance Critical',
         `Your balance is ₹${balance.toFixed(2)}.\n\nYour charging session is being stopped automatically.\n\nCost so far: ₹${cost.toFixed(2)}`,
@@ -286,7 +281,20 @@ export default function SessionScreen() {
     };
   }, [navigation]);
 
-  // SOC target reached alert 
+  useEffect(() => {
+    const handleSocUpdate = (msg: any) => {
+      const data = msg.data || msg;
+      if (data.targetSoc) {
+        setTargetSoc(data.targetSoc);  // update the progress bar target
+        // Show brief toast
+        console.log(`SOC target updated to ${data.targetSoc}%`);
+      }
+    };
+    socket.on('target_soc_updated', handleSocUpdate);
+    return () => socket.off('target_soc_updated', handleSocUpdate);
+  }, []);
+  
+  //  SOC target reached alert ()
   useEffect(() => {
     const handleSocTargetReached = (data: any) => {
       const vehicleName = data?.vehicle || 'vehicle';
@@ -295,10 +303,9 @@ export default function SessionScreen() {
       Alert.alert(
         'Target Charge Reached',
         `Your ${vehicleName} has reached ${targetSoc}% charge.\n\nCharging stopped.`,
-        [{ text: 'OK', onPress: () => navigation.navigate('Home') }]
+        [{ text: 'OK', onPress: () => navigation.navigate('Wallet') }]
       );
-    };
-    
+    };    
     socket.on('soc_target_reached', handleSocTargetReached);
     return () => socket.off('soc_target_reached', handleSocTargetReached);
   }, [navigation]);
@@ -312,6 +319,8 @@ export default function SessionScreen() {
   const powerKw = isFinite((telemetry?.powerW || 0) / 1000)
     ? (telemetry?.powerW || 0) / 1000 : 0;
   const batteryKwh = user?.batteryCapacityKwh;
+  const costSoFar = telemetry?.costSoFar ?? 0;
+  const userBudget = user?.monthlyBudget;
 
   const estimatedMinutes = useMemo(() => {
     if (!batteryKwh || currentSoc == null || powerKw <= 0 || currentSoc >= targetSoc) return null;
@@ -319,7 +328,12 @@ export default function SessionScreen() {
     return isFinite(r) && r > 0 ? Math.round(r) : null;
   }, [batteryKwh, currentSoc, powerKw, targetSoc]);
 
-  // Stop confirmation 
+  //  Connectivity status for live indicator
+  const secondsSinceUpdate = lastTelemetryAt 
+    ? Math.floor((Date.now() - lastTelemetryAt) / 1000)
+    : null;
+
+  // Stop confirmation ()
   const handleStop = useCallback(() => {
     if (!activeSession) return;
     const energy = telemetry?.energyKwh ?? 0;
@@ -340,8 +354,7 @@ export default function SessionScreen() {
             try {
               const s: SessionSummary = {
                 chargeBoxId: activeSession.chargeBoxId,
-                duration: elapsed,
-                energyKwh: energy,
+                duration: elapsed, energyKwh: energy,
                 costTotal: cost,
                 peakPowerKw: peakPower,
                 startSoc,
@@ -369,6 +382,7 @@ export default function SessionScreen() {
     return (
       <View style={[styles.empty, { backgroundColor: theme.bg }]}>
         <View style={styles.emptyIcon}>
+          {/*  Static icon for empty state */}
           <AppIcon.Plug size={IconSize.xl} color={IconColors.muted} />
         </View>
         <Text style={[styles.emptyTitle, { color: theme.text }]}>No Active Session</Text>
@@ -384,14 +398,12 @@ export default function SessionScreen() {
     );
   }
 
-  const secondsSinceUpdate = lastUpdate ? Math.floor((Date.now() - lastUpdate.getTime()) / 1000) : null;
   const isStale = secondsSinceUpdate != null && secondsSinceUpdate > 30;
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.bg }]}>
       <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        style={styles.scroll} contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -410,16 +422,16 @@ export default function SessionScreen() {
               <Text style={[styles.badgeText, { color: theme.success }]}>CHARGING</Text>
             </View>
             
-            {/* Outdoor mode toggle */}
+            {/*  Dynamic connectivity indicator */}
             <TouchableOpacity 
               style={[styles.outdoorBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
               onPress={toggleOutdoorMode}
             >
-              {outdoorMode ? (
-                <AppIcon.Gauge size={IconSize.md} color={IconColors.warning} />
-              ) : (
-                <AppIcon.Battery size={IconSize.md} color={IconColors.muted} />
-              )}
+              <DynamicConnectivityIcon 
+                connected={wsConnected} 
+                lastUpdateSeconds={secondsSinceUpdate}
+                size={IconSize.md}
+              />
             </TouchableOpacity>
           </View>
 
@@ -427,20 +439,24 @@ export default function SessionScreen() {
             {formatTime(elapsed)}
           </Text>
 
+          {/*  Stale data warning with dynamic icon */}
           {isStale && (
             <View style={styles.staleRow}>
-              <AppIcon.WifiOff size={IconSize.xs} color={IconColors.warning} />
+              <DynamicConnectivityIcon 
+                connected={true} 
+                lastUpdateSeconds={secondsSinceUpdate}
+                size={IconSize.xs}
+              />
               <Text style={[styles.staleText, { color: IconColors.warning }]}>
                 Last update {secondsSinceUpdate}s ago
               </Text>
             </View>
           )}
-
           {/* Progress + Est Time */}
           <View style={[styles.progressCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <View style={styles.progressHeader}>
               <Text style={[styles.progressLabel, { color: theme.textSecondary }]}>
-                {currentSoc != null ? `${currentSoc}%  →  ${targetSoc}%` : `Target: ${targetSoc}%`}
+                {currentSoc != null ? `${currentSoc}% → ${targetSoc}%` : `Target: ${targetSoc}%`}
               </Text>
               {estimatedMinutes != null && (
                 <View style={styles.estTimeRow}>
@@ -459,18 +475,43 @@ export default function SessionScreen() {
           </View>
         </View>
 
-        {/* Stat Rows (using icon components) */}
+        {/*  Stat Rows with Dynamic Icons */}
         <View style={[styles.statsCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <StatRow
             theme={theme}
             left={{ 
-              icon: AppIcon.Zap, 
+              icon: <DynamicBatteryIcon 
+                soc={telemetry?.socPercent} 
+                charging={true} 
+                size={IconSize.md} 
+              />,
+              label: 'Battery SOC', 
+              value: currentSoc != null ? `${currentSoc}%` : '—', 
+              color: theme.soc 
+            }}
+            right={{ 
+              icon: <DynamicPowerIcon 
+                powerKw={powerKw} 
+                size={IconSize.md} 
+              />,
               label: 'Power', 
               value: `${fmt(powerKw)} kW`, 
               color: theme.power 
             }}
+          />
+          <StatRow
+            theme={theme}
+            left={{ icon: <DynamicCostIcon 
+                cost={costSoFar} 
+                budget={userBudget}
+                size={IconSize.md} 
+              />,
+              label: 'Cost So Far', 
+              value: `₹${fmt(costSoFar)}`, 
+              color: theme.cost 
+            }}
             right={{ 
-              icon: AppIcon.BatteryCharging, 
+              icon: <AppIcon.Battery size={IconSize.md} color={theme.soc} />,
               label: 'Energy', 
               value: `${fmt(telemetry?.energyKwh, 3)} kWh`, 
               color: theme.energy 
@@ -479,28 +520,13 @@ export default function SessionScreen() {
           <StatRow
             theme={theme}
             left={{ 
-              icon: AppIcon.Rupee, 
-              label: 'Cost So Far', 
-              value: `₹${fmt(telemetry?.costSoFar)}`, 
-              color: theme.cost 
-            }}
-            right={{ 
-              icon: AppIcon.Battery, 
-              label: 'Battery SOC', 
-              value: currentSoc != null ? `${currentSoc}%` : '—', 
-              color: theme.soc 
-            }}
-          />
-          <StatRow
-            theme={theme}
-            left={{ 
-              icon: AppIcon.Gauge, 
+              icon: <AppIcon.Gauge size={IconSize.md} color={theme.voltage} />,
               label: 'Voltage', 
               value: `${fmt(telemetry?.voltageV, 0)} V`, 
               color: theme.voltage 
             }}
             right={{ 
-              icon: AppIcon.Activity, 
+              icon: <AppIcon.Activity size={IconSize.md} color={theme.current} />,
               label: 'Current', 
               value: `${fmt(telemetry?.currentA, 1)} A`, 
               color: theme.current 
@@ -510,9 +536,23 @@ export default function SessionScreen() {
 
         {/* Professional Chart */}
         <PowerChart data={powerHistory} />
-      </ScrollView>
+        
+        {/*  Charging Efficiency Card (with dynamic icon) */}
+        <ChargingEfficiencyCard 
+          summary={{
+            chargeBoxId: activeSession.chargeBoxId,
+            duration: elapsed,
+            energyKwh: telemetry?.energyKwh ?? 0,
+            costTotal: costSoFar,
+            peakPowerKw: peakPower,
+            startSoc,
+            endSoc: currentSoc,
+          }} 
+          user={user} 
+          theme={theme} 
+        /> </ScrollView>
 
-      {/* Stop Button (no emojis) */}
+      {/*  Stop Button with Dynamic Power Icon */}
       <View style={[styles.stopWrap, { backgroundColor: theme.bg }]}>
         <TouchableOpacity
           style={[styles.stopBtn, { backgroundColor: theme.error, shadowColor: theme.error }]}
@@ -525,7 +565,7 @@ export default function SessionScreen() {
           {isLoading
             ? <ActivityIndicator color={theme.textInverse} size="large" />
             : <>
-                <AppIcon.Power size={IconSize.md} color={theme.textInverse} />
+                <DynamicPowerIcon powerKw={powerKw} size={IconSize.md} />
                 <Text style={[styles.stopText, { color: theme.textInverse }]}>Stop Charging</Text>
               </>
           }
@@ -535,14 +575,14 @@ export default function SessionScreen() {
   );
 }
 
-// ─── Summary Screen (with Efficiency Card, no emojis) ──
+// ─── Summary Screen (with Efficiency Card, ) ──
 function SummaryScreen({ summary, onDismiss, theme, user }:
   { summary: SessionSummary; onDismiss: () => void; theme: any; user: any }) {
   const costPerKwh = summary.energyKwh > 0 ? (summary.costTotal / summary.energyKwh).toFixed(2) : '—';
   const co2 = (summary.energyKwh * 0.82).toFixed(2);
   const km = (summary.energyKwh * 6).toFixed(0);
 
-  // 
+  // Tips without emojis
   const tips: string[] = [];
   if (summary.peakPowerKw > 100)
     tips.push('DC fast charging used — ideal for highway stops.');
@@ -559,9 +599,9 @@ function SummaryScreen({ summary, onDismiss, theme, user }:
     <ScrollView 
       style={[styles.screen, { backgroundColor: theme.bg }]}
       contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 }]}
-    >
-      <View style={styles.header}>
+    > <View style={styles.header}>
         <View style={styles.checkIcon}>
+          {/*  Static success icon for completion */}
           <AppIcon.Success size={IconSize.xxl} color={IconColors.success} />
         </View>
         <Text style={[styles.title, { color: theme.text }]}>Session Complete</Text>
@@ -606,9 +646,8 @@ function SummaryScreen({ summary, onDismiss, theme, user }:
         <SummRow label="Duration" value={formatDuration(summary.duration)} theme={theme} />
       </View>
 
-      {/* Charging Efficiency Card */}
+      {/*  Charging Efficiency Card */}
       <ChargingEfficiencyCard summary={summary} user={user} theme={theme} />
-
       <View style={[styles.tipsCard, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
         <View style={styles.tipsTitleRow}>
           <AppIcon.Info size={IconSize.md} color={theme.accentBright} />
@@ -658,8 +697,7 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 16, paddingBottom: 8 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyIcon: { marginBottom: 16, alignItems: 'center', justifyContent: 'center' },
-  emptyTitle: { fontSize: 22, fontWeight: '700', marginBottom: 8 },
-  emptySub: { fontSize: 15, marginBottom: 24 },
+  emptyTitle: { fontSize: 22, fontWeight: '700', marginBottom: 8 }, emptySub: { fontSize: 15, marginBottom: 24 },
   refreshBtn: { borderRadius: 10, paddingHorizontal: 28, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   refreshText: { fontWeight: '600', fontSize: 15 },
   header: { marginBottom: 14 },
@@ -708,8 +746,7 @@ const stat = StyleSheet.create({
 const summ = StyleSheet.create({
   bigStat: { flex: 1, borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1, gap: 6 },
   bigVal: { fontSize: 20, fontWeight: '800' },
-  bigUnit: { fontSize: 11 },
-  bigLabel: { fontSize: 10, textTransform: 'uppercase', marginTop: 4, textAlign: 'center' },
+  bigUnit: { fontSize: 11 }, bigLabel: { fontSize: 10, textTransform: 'uppercase', marginTop: 4, textAlign: 'center' },
   row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1 },
   rowLabel: { fontSize: 14 },
   rowValue: { fontSize: 14, fontWeight: '600' },

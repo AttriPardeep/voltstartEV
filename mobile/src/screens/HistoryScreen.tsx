@@ -27,42 +27,101 @@ export default function HistoryScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchHistory = useCallback(async () => {
+  const fetchHistory = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
-      const res = await api.get('/api/charging/sessions', { params: { limit: 20 } });
-
+      const res = await api.get('/api/charging/sessions', {
+        params: { limit: 20 }
+      });
+  
       const mappedSessions: Session[] = (res.data.data || []).map((item: any) => {
-        // Calculate energy from meters if energy_kwh is 0/null (for active sessions)
         let energyKwh = Number(item.energy_kwh ?? 0);
-        if (energyKwh === 0 && item.start_meter_value != null && item.end_meter_value != null) {
-          energyKwh = Number(((item.end_meter_value - item.start_meter_value) / 1000).toFixed(3));
+        if (
+          energyKwh === 0 &&
+          item.start_meter_value != null &&
+          item.end_meter_value != null &&
+          item.end_meter_value > item.start_meter_value
+        ) {
+          energyKwh = Number(
+            ((item.end_meter_value - item.start_meter_value) / 1000).toFixed(3)
+          );
         }
+  
+        // For active sessions, seed liveCost from last_cost
+        // last_cost is updated every meter value on backend
+        // This prevents the zero flash on refresh
+        const isActive = item.status === 'active';
+        const seededCost = isActive
+          ? (item.last_cost != null ? Number(item.last_cost) : null)
+          : null;
+  
+        const seededEnergy = isActive && energyKwh === 0
+          ? (item.last_meter_value != null && item.start_meter_value != null
+              ? Number(((item.last_meter_value - item.start_meter_value) / 1000).toFixed(3))
+              : null)
+          : null;
+  
         return {
-          sessionId: item.session_id,
-          transactionId: item.steve_transaction_pk,  //  Map to transactionId for WebSocket matching
-          chargeBoxId: item.charge_box_id,
-          startTime: item.start_time,
-          endTime: item.end_time,
+          sessionId:     item.session_id,
+          transactionId: item.steve_transaction_pk,
+          chargeBoxId:   item.charge_box_id,
+          startTime:     item.start_time,
+          endTime:       item.end_time,
           energyKwh,
-          totalCost: item.total_cost != null ? Number(item.total_cost) : null,
-          status: item.status || 'unknown',
-          stopReason: item.stop_reason,
-          pricingModel: item.pricing_model,
-          tiers: item.tiers ?? null,
+          totalCost:     item.total_cost  != null ? Number(item.total_cost)  : null,
+          lastCost:      item.last_cost   != null ? Number(item.last_cost)   : null,
+          status:        item.status || 'unknown',
+          stopReason:    item.stop_reason,
+          pricingModel:  item.pricing_model,
+          tiers:         item.tiers ?? null,
+          // Seed live values from DB for active sessions
+          liveCost:      seededCost,
+          liveEnergyKwh: seededEnergy,
+          powerW:        null,
         };
       });
-
-      // Sort: active sessions first, then by start_time DESC
+  
       const sorted = [...mappedSessions].sort((a, b) => {
         if (a.status === 'active' && b.status !== 'active') return -1;
         if (b.status === 'active' && a.status !== 'active') return 1;
         return new Date(b.startTime).getTime() - new Date(a.startTime).getTime();
       });
-
-      setSessions(sorted);
+  
+      // Merge with existing live values — don't wipe WS data on refresh
+      setSessions(prev => {
+        return sorted.map(newSession => {
+          // Find existing session with live data
+          const existing = prev.find(
+            p => p.transactionId === newSession.transactionId
+          );
+  
+          if (!existing || newSession.status !== 'active') {
+            return newSession;
+          }
+          // Preserve live values if they're more recent than what API returned
+          return {
+            ...newSession,
+            liveCost: (
+              existing.liveCost != null &&
+              existing.liveCost > (newSession.liveCost ?? 0)
+            )
+              ? existing.liveCost        // keep WS value — it's newer
+              : newSession.liveCost,     // use DB seeded value
+  
+            liveEnergyKwh: (
+              existing.liveEnergyKwh != null &&
+              existing.liveEnergyKwh > (newSession.liveEnergyKwh ?? 0)
+            )
+              ? existing.liveEnergyKwh
+              : newSession.liveEnergyKwh,
+            powerW: existing.powerW,   // always keep last power reading
+          };
+        });
+      });
+  
     } catch (error) {
       console.error('Failed to fetch history:', error);
-      setSessions([]);
+      if (!silent) setSessions([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -132,7 +191,7 @@ export default function HistoryScreen() {
       const balance = Number(payload.currentBalance ?? 0);
       const cost = Number(payload.costSoFar ?? 0);
       Alert.alert(
-        '⚠️ Wallet Balance Critical',
+        'Wallet Balance Critical',
         `Your balance is ₹${balance.toFixed(2)}.\n\nYour charging session is being stopped automatically.\n\nCost so far: ₹${cost.toFixed(2)}`,
         [
           {
@@ -190,22 +249,23 @@ export default function HistoryScreen() {
     });
   };
 
-  //  Get cost: live for active, final for completed
   const getSessionCost = (s: Session): number => {
     if (s.status === 'active') {
-      // Use live cost from WebSocket, fallback to 0
-      return Number(s.liveCost ?? 0);
+      // Priority: liveCost (WebSocket) > lastCost (DB) > 0
+      if (s.liveCost != null && s.liveCost > 0) return s.liveCost;
+      if (s.lastCost != null && s.lastCost > 0) return s.lastCost;
+      return 0;
     }
-    // Use final cost from database
-    return Number(s.totalCost ?? 0);
+    return Number(s.totalCost ?? s.lastCost ?? 0);
   };
-
-  //  Get energy: live for active, final for completed
+  
   const getSessionEnergy = (s: Session): number => {
     if (s.status === 'active') {
-      return Number(s.liveEnergyKwh ?? s.energyKwh ?? 0);
+      if (s.liveEnergyKwh != null && s.liveEnergyKwh > 0) return s.liveEnergyKwh;
+      if (s.energyKwh > 0) return s.energyKwh;
+      return 0;
     }
-    return Number(s.energyKwh ?? 0);
+    return s.energyKwh ?? 0;
   };
 
   const getStatusBadge = (status: string) => {

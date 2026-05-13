@@ -3,52 +3,30 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import {
   //  Battery & Charging
-  Zap, Battery, BatteryCharging, BatteryFull, BatteryMedium, BatteryLow,
-  Plug, PlugZap, Power,
-  //  Payment & Wallet
-  Wallet, CreditCard, IndianRupee, DollarSign,
-  //  User & Fleet
-  User, Building2, Building, CarFront, Van,
+  Zap, CreditCard, Building2, User, Wallet, CarFront,
+  BatteryCharging, Battery, BatteryFull, BatteryMedium, BatteryLow,
   // ️ Status & Alerts
-  TriangleAlert, AlertCircle, CheckCircle, CircleX, Info,  
+  TriangleAlert, CheckCircle, XCircle, AlertCircle, Info,
   // ️ Navigation & Map
-  MapPin, Navigation, Home, TrendingUp, Clock,
-  // ️ UI Actions
-  RefreshCw, Plus, Minus, X, SquarePen, Trash2,  
-  Filter, Search, List, Settings, ChevronRight, ChevronLeft,
-  //  Auth & Security
-  Shield, Lock, Eye, EyeOff, LogOut,
+  TrendingUp, MapPin, RefreshCw, Clock, Shield, Star,
   //  Communication
-  Bell, Phone, Mail,
+  Bell, Settings, ChevronRight, Plus, X, Edit2, Trash2,
+  Navigation, Filter, Search, LogOut, Lock, Eye, EyeOff,
   //  Connectivity
-  Wifi, WifiOff,
-  //  Misc
-  Star, Target, Gauge, Activity,
+  Wifi, WifiOff, Plug, PlugZap, Gauge, IndianRupee, Home,
+  //  Additional icons for dynamic system
+  CircleX, SquarePen, Target, Activity, DollarSign,
 } from 'lucide-react-native';
 
-// ── Centralized Color Palette ──────────────────────────
-/**
- * VoltStartEV brand colors for icons.
- * 
- * TODO: Replace with theme context integration for dark mode:
- *   const { colors } = useTheme();
- *   color = props.color || colors[defaultColorKey];
- */
-export const IconColors = {
-  primary: '#22d3ee',  // Cyan - charging, active states
-  success: '#10b981',  // Green - completed, positive
-  warning: '#f59e0b',  // Amber - caution, target SOC
-  error:   '#ef4444',  // Red - errors, blocked
-  info:    '#3b82f6',  // Blue - informational
-  muted:   '#64748b',  // Gray - secondary, inactive
-  purple:  '#a78bfa',  // Purple - cards, premium
-  font:    '#f1f5f9',  // Light grayish blue (white)
-  selected:'#ffd700',
-} as const;
-
-export type IconColorKey = keyof typeof IconColors;
-
 // ── Types ─────────────────────────────────────────────
+type LucideIcon = React.ComponentType<{
+  size?: number;
+  color?: string;
+  strokeWidth?: number;
+  accessibilityLabel?: string;
+  testID?: string;
+}>;
+
 export type IconProps = {
   size?: number;
   color?: string;
@@ -57,25 +35,19 @@ export type IconProps = {
   testID?: string;
 };
 
-type IconComponent = React.ComponentType<IconProps>;
-
-// ── Factory ───────────────────────────────────────────
+// ── Factory ──────────────────────────────────────────────
 /**
- * Creates a consistent icon component with default props.
- * @param Component - The lucide-react-native icon component
- * @param defaultColor - Default color key from IconColors or hex value
- * @returns A reusable icon component with sensible defaults
- */
-export function createIcon(
-  Component: IconComponent,
-  defaultColor: string = IconColors.muted
-): React.FC<IconProps> {
-  return ({
+* Creates a consistent icon component with default props.
+* @param Component - The lucide-react-native icon component
+* @param defaultColor - Default color if not overridden
+* @returns A memoized, reusable icon component
+*/
+function createIcon(Component: LucideIcon, defaultColor = '#64748B') {
+  return React.memo(({
     size = 20,
     color = defaultColor,
     strokeWidth = 2,
-    accessibilityLabel,
-    testID,
+    accessibilityLabel,    testID,
     ...props
   }: IconProps) => (
     <Component
@@ -86,140 +58,158 @@ export function createIcon(
       testID={testID}
       {...props}
     />
+  ), (prev, next) =>
+    prev.size === next.size &&
+    prev.color === next.color &&
+    prev.strokeWidth === next.strokeWidth
   );
 }
 
-// ── Size Constants ────────────────────────────────────
+// ── Brand colour palette ─────────────────────────────────
+/**
+* VoltStartEV brand colors for icons.
+*
+* TODO: Integrate with theme context for dark mode:
+*   const { colors } = useTheme();
+*   color = props.color || colors[defaultColorKey];
+*/
+export const IconColors = {
+  primary: '#22D3EE',   // teal  — charging, active, primary action
+  success: '#10B981',   // green — available, success, healthy
+  warning: '#F59E0B',   // amber — low battery, slow charge, caution
+  error:   '#EF4444',   // red   — faulted, blocked, error
+  purple:  '#A78BFA',   // purple— reserved, RFID card
+  muted:   '#64748B',   // slate — inactive, secondary
+  sub:     '#94A3B8',   // lighter slate — labels
+  font:    '#f1f5f9',  // Light grayish blue (white)
+  selected:'#ffd700',
+} as const;
+
+export type IconColorKey = keyof typeof IconColors;
+
+// ── Size scale ───────────────────────────────────────────
 export const IconSize = {
-  xs:   12,   // Inside small badges (fontSize 10-11)
-  sm:   16,   // Inline with body text (fontSize 13-14)
-  md:   20,   // Standard UI icons (fontSize 15-16)
-  lg:   24,   // Section headers (fontSize 18-20)
-  xl:   32,   // Empty state illustrations
-  xxl:  48,   // Hero icons
+  xs:  12,  // badge interiors (fontSize 10-11)
+  sm:  16,  // inline body text (fontSize 13-14)
+  md:  20,  // standard UI icons (fontSize 15-16)
+  lg:  24,  // section headers (fontSize 18-20)
+  xl:  32,  // empty state illustrations
+  xxl: 48,  // hero icons
 } as const;
 
 export type IconSizeKey = keyof typeof IconSize;
-
-// ── All App Icons with Brand Defaults ─────────────────
+// ── All app icons (STATIC) ───────────────────────────────
 /**
- * Centralized, frozen icon library for VoltStartEV.
- * 
- * Usage:
- *   <AppIcon.Zap size={24} />
- *   <AppIcon.Wallet color={IconColors.success} />
- * 
- * Colors reference IconColors constants for easy theming.
- */
-export const AppIcon = Object.freeze({  
+* Centralized, frozen icon library for VoltStartEV.
+*
+* Usage:
+*   <AppIcon.Zap size={24} />
+*   <AppIcon.Wallet color={IconColors.success} />
+*
+* Colors reference IconColors constants for easy theming.
+*
+*  For real-time values, use DynamicIcons instead:
+*   import { DynamicBatteryIcon } from '../components/icons';
+*   <DynamicBatteryIcon soc={45} charging={true} />
+*/
+export const AppIcon = Object.freeze({
   //  Battery & Charging
-  Battery:          createIcon(Battery,          IconColors.muted),
-  BatteryCharging:  createIcon(BatteryCharging,  IconColors.primary),
-  BatteryFull:      createIcon(BatteryFull,      IconColors.success),
-  BatteryMedium:    createIcon(BatteryMedium,    IconColors.warning),
-  BatteryLow:       createIcon(BatteryLow,       IconColors.error),
-  Zap:              createIcon(Zap,              IconColors.primary),
-  Plug:             createIcon(Plug,             IconColors.primary),
-  PlugZap:          createIcon(PlugZap,          IconColors.success),
-  Power:            createIcon(Power,            IconColors.error),
-  
+  Zap:             createIcon(Zap,             IconColors.primary),
+  Plug:            createIcon(Plug,            IconColors.muted),
+  PlugZap:         createIcon(PlugZap,         IconColors.warning),
+  BatteryCharging: createIcon(BatteryCharging, IconColors.primary),
+  Battery:         createIcon(Battery,         IconColors.muted),
+  BatteryFull:     createIcon(BatteryFull,     IconColors.success),
+  BatteryMedium:   createIcon(BatteryMedium,   IconColors.warning),
+  BatteryLow:      createIcon(BatteryLow,      IconColors.error),
+ 
   //  Payment & Wallet
-  Wallet:           createIcon(Wallet,           IconColors.primary),
-  Card:             createIcon(CreditCard,       IconColors.purple),
-  Rupee:            createIcon(IndianRupee,      IconColors.success),
-  Dollar:           createIcon(DollarSign,       IconColors.success),
-  
+  Wallet:          createIcon(Wallet,          IconColors.primary),
+  Card:            createIcon(CreditCard,      IconColors.purple),
+  Rupee:           createIcon(IndianRupee,     IconColors.success),
+  Dollar:          createIcon(DollarSign,      IconColors.success),
+ 
   //  User & Fleet
-  User:             createIcon(User,             IconColors.muted),
-  FleetBuilding:    createIcon(Building2,        IconColors.primary),
-  Building:         createIcon(Building,         IconColors.muted),
-  Car:              createIcon(CarFront,         IconColors.primary),
-  Van:              createIcon(Van,              IconColors.primary),
-  
+  User:            createIcon(User,            IconColors.muted),
+  FleetBuilding:   createIcon(Building2,       IconColors.primary),
+  Building:        createIcon(Building2,       IconColors.muted),
+  Car:             createIcon(CarFront,        IconColors.primary),
+  Van:             createIcon(CarFront,        IconColors.primary),
+ 
   // ️ Status & Alerts
-  Success:          createIcon(CheckCircle,      IconColors.success),
-  Error:            createIcon(CircleX,          IconColors.error),  
-  Warning:          createIcon(TriangleAlert,    IconColors.warning),
-  Info:             createIcon(Info,             IconColors.info),
-  AlertCircle:      createIcon(AlertCircle,      IconColors.error),
-  
-  //  Navigation & Map
-  Location:         createIcon(MapPin,           IconColors.primary),
-  Navigation:       createIcon(Navigation,       IconColors.primary),
-  Home:             createIcon(Home,             IconColors.muted),
-  TrendingUp:       createIcon(TrendingUp,       IconColors.success),
-  Clock:            createIcon(Clock,            IconColors.warning),
-  
-  //  UI Actions
-  Refresh:          createIcon(RefreshCw,        IconColors.muted),
-  Plus:             createIcon(Plus,             IconColors.primary),
-  Minus:            createIcon(Minus,            IconColors.muted),
-  Close:            createIcon(X,                IconColors.muted),
-  Edit:             createIcon(SquarePen,        IconColors.muted),  // ✅ SquarePen
-  Delete:           createIcon(Trash2,           IconColors.error),
-  Filter:           createIcon(Filter,           IconColors.muted),
-  Search:           createIcon(Search,           IconColors.muted),
-  List:             createIcon(List,             IconColors.muted),
-  Settings:         createIcon(Settings,         IconColors.muted),
-  ChevronRight:     createIcon(ChevronRight,     IconColors.muted),
-  ChevronLeft:      createIcon(ChevronLeft,      IconColors.muted),
-  
+  Success:         createIcon(CheckCircle,     IconColors.success),
+  Error:           createIcon(CircleX,         IconColors.error),  // Updated from XCircle
+  Warning:         createIcon(TriangleAlert,   IconColors.warning),
+  Info:            createIcon(Info,            '#3B82F6'),
+  AlertCircle:     createIcon(AlertCircle,     IconColors.error),
+ 
+  // ️ Navigation & Map
+  Location:        createIcon(MapPin,          IconColors.primary),
+  Navigation:      createIcon(Navigation,      IconColors.primary),
+  Home:            createIcon(Home,            IconColors.muted),
+  TrendingUp:      createIcon(TrendingUp,      IconColors.success), 
+  // ️ UI Actions
+  Refresh:         createIcon(RefreshCw,       IconColors.muted),
+  Plus:            createIcon(Plus,            IconColors.primary),
+  Minus:           createIcon(X,               IconColors.muted),  // X used as minus
+  Close:           createIcon(X,               IconColors.muted),
+  Edit:            createIcon(SquarePen,       IconColors.muted),  // Updated from Edit2
+  Delete:          createIcon(Trash2,          IconColors.error),
+  Filter:          createIcon(Filter,          IconColors.muted),
+  Search:          createIcon(Search,          IconColors.muted),
+  Settings:        createIcon(Settings,        IconColors.muted),
+  ChevronRight:    createIcon(ChevronRight,    IconColors.muted),
+  ChevronLeft:     createIcon(ChevronRight,    IconColors.muted),  // Rotate via transform if needed
+  List:            createIcon(CarFront,        IconColors.muted),  // Placeholder; replace with actual List icon if available
+ 
   //  Auth & Security
-  Lock:             createIcon(Lock,             IconColors.muted),
-  Shield:           createIcon(Shield,           IconColors.success),
-  Eye:              createIcon(Eye,              IconColors.muted),
-  EyeOff:           createIcon(EyeOff,           IconColors.muted),
-  LogOut:           createIcon(LogOut,           IconColors.error),
-  
+  Lock:            createIcon(Lock,            IconColors.muted),
+  Shield:          createIcon(Shield,          IconColors.success),
+  Eye:             createIcon(Eye,             IconColors.muted),
+  EyeOff:          createIcon(EyeOff,          IconColors.muted),
+  LogOut:          createIcon(LogOut,          IconColors.error),
+ 
   //  Communication
-  Bell:             createIcon(Bell,             IconColors.primary),
-  Phone:            createIcon(Phone,            IconColors.muted),
-  Mail:             createIcon(Mail,             IconColors.muted),
-  
+  Bell:            createIcon(Bell,            IconColors.primary),
+ 
   //  Connectivity
-  Wifi:             createIcon(Wifi,             IconColors.success),
-  WifiOff:          createIcon(WifiOff,          IconColors.error),
-  
+  Wifi:            createIcon(Wifi,            IconColors.success),
+  WifiOff:         createIcon(WifiOff,         IconColors.error),
+ 
   //  Misc
-  Star:             createIcon(Star,             IconColors.warning),
-  Target:           createIcon(Target,           IconColors.primary),
-  Gauge:            createIcon(Gauge,            IconColors.primary),
-  Activity:         createIcon(Activity,         IconColors.primary),
+  Clock:           createIcon(Clock,           IconColors.warning),
+  Star:            createIcon(Star,            '#F59E0B'),
+  Gauge:           createIcon(Gauge,           IconColors.muted),
+  Activity:        createIcon(Activity,        IconColors.primary),
+  Target:          createIcon(Target,          IconColors.primary),
 });
 
-// ── Reusable Composed Components ──────────────────────
-
+// ── Composed helper components (STATIC) ──────────────────
 /**
- * IconBadge — Displays an icon + label side-by-side in a pill-shaped badge.
- * 
- * @example
- * <IconBadge icon={AppIcon.Zap} label="App Tag" />
- * 
- * @param icon - An icon from AppIcon (e.g., AppIcon.Zap)
- * @param label - Text to display next to the icon
- * @param color - Text and icon color (default: brand primary)
- * @param background - Badge background color (default: dark cyan)
- * @param size - Icon size (default: IconSize.xs = 12px)
- */
+* IconBadge — icon + label pill
+* Use for: Primary badge, Blocked badge, Tag type labels
+*
+* @example
+* <IconBadge icon={AppIcon.Star} label="Primary" />
+*/
 export function IconBadge({
   icon: Icon,
   label,
-  color      = IconColors.primary,
-  background = '#0c4a6e',
-  size       = IconSize.xs,
+  color = IconColors.primary,
+  background = '#0C4A6E',  size = IconSize.xs,
   accessibilityLabel,
   testID,
 }: {
-  icon:        React.FC<IconProps>;
-  label:       string;
-  color?:      string;
+  icon: React.FC<IconProps>;
+  label: string;
+  color?: string;
   background?: string;
-  size?:       number;
+  size?: number;
   accessibilityLabel?: string;
   testID?: string;
 }) {
   return (
-    <View 
+    <View
       style={[ib.badge, { backgroundColor: background }]}
       accessibilityLabel={accessibilityLabel || label}
       testID={testID}
@@ -230,80 +220,114 @@ export function IconBadge({
   );
 }
 
-const ib = StyleSheet.create({
-  badge: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    gap:            4,
-    borderRadius:   20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  label: {
-    fontSize:   11,
-    fontWeight: '700',
-    includeFontPadding: false,
-  },
-});
-
 /**
- * IconRow — Displays an icon + text in a horizontal row.
- * Ideal for section headers, list items, and navigation labels.
- * 
- * @example
- * <IconRow icon={AppIcon.Car} label="My Vehicles" fontSize={18} />
- * 
- * @param icon - An icon from AppIcon
- * @param label - Text to display next to the icon
- * @param color - Text color (icon uses same color unless iconColor overridden)
- * @param iconColor - Optional: override icon color separately
- * @param size - Icon size (default: IconSize.md = 20px)
- * @param gap - Space between icon and text (default: 8px)
- * @param fontSize - Text font size (default: 16px)
- * @param fontWeight - Text font weight (default: '700')
- */
+* IconRow — icon + text row
+* Use for: Section headers, list items, nav items
+*
+* @example
+* <IconRow icon={AppIcon.Car} label="My Vehicles" />
+*/
 export function IconRow({
   icon: Icon,
   label,
-  color     = '#f1f5f9',
+  color = '#F1F5F9',
   iconColor,
-  size      = IconSize.md,
-  gap       = 8,
-  fontSize  = 16,
+  size = IconSize.md,
+  gap = 8,
+  fontSize = 16,
   fontWeight = '700' as const,
   accessibilityLabel,
   testID,
 }: {
-  icon:        React.FC<IconProps>;
-  label:       string;
-  color?:      string;
-  iconColor?:  string;
-  size?:       number;
-  gap?:        number;
-  fontSize?:   number;
-  fontWeight?: '400' | '600' | '700' | '800';
+  icon: React.FC<IconProps>;
+  label: string;
+  color?: string;
+  iconColor?: string;
+  size?: number;
+  gap?: number;
+  fontSize?: number;  fontWeight?: '400'|'600'|'700'|'800';
   accessibilityLabel?: string;
   testID?: string;
 }) {
   return (
-    <View 
+    <View
       style={[ir.row, { gap }]}
       accessibilityLabel={accessibilityLabel || label}
       testID={testID}
     >
       <Icon size={size} color={iconColor ?? color} />
-      <Text style={[ir.label, { color, fontSize, fontWeight }]}>
-        {label}
-      </Text>
+      <Text style={[ir.label, { color, fontSize, fontWeight }]}>{label}</Text>
     </View>
   );
 }
+
+const ib = StyleSheet.create({
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4
+  },
+  label: {
+    fontSize: 11,
+    fontWeight: '700',
+    includeFontPadding: false,
+  },
+});
 
 const ir = StyleSheet.create({
   row:   { flexDirection: 'row', alignItems: 'center' },
   label: { includeFontPadding: false },
 });
 
-// ── Exports ───────────────────────────────────────────
-// ✅ Only export createIcon (IconProps already exported inline above)
-export { createIcon };
+// ── Dynamic Icons (RE-EXPORT) ────────────────────────────
+/**
+* Dynamic icons that change appearance based on live values.
+* All components are React.memo'd with custom comparators for performance.
+*
+* Map Marker Warning:
+* Do NOT use DynamicStatusIcon inside <Marker> components.
+* Use pure View-based icons (like BoltIcon) for map markers instead.
+* Dynamic icons are safe for modals, lists, and regular UI.
+*
+* @example
+* import { DynamicBatteryIcon } from '../components/icons';
+* <DynamicBatteryIcon soc={45} charging={true} /> */
+export {
+  DynamicBatteryIcon,
+  DynamicPowerIcon,
+  DynamicCostIcon,
+  DynamicStatusIcon,
+  DynamicConnectivityIcon,
+  DynamicEfficiencyIcon,
+} from './DynamicIcons';
+
+// ── Exports Summary ──────────────────────────────────────
+/**
+* Exported from this module:
+*
+* STATIC (always available):
+* - AppIcon: { Zap, Battery, Wallet, ... } — all static icons
+* - IconColors: { primary, success, warning, ... } — brand colors
+* - IconSize: { xs, sm, md, lg, xl, xxl } — size constants
+* - IconBadge: icon + label pill component
+* - IconRow: icon + text row component
+* - createIcon: factory function (advanced use)
+*
+* DYNAMIC (opt-in for real-time values):
+* - DynamicBatteryIcon: changes with SOC %
+* - DynamicPowerIcon: changes with kW level
+* - DynamicCostIcon: changes with cost vs budget
+* - DynamicStatusIcon: changes with charger state (modal/list only)
+* - DynamicConnectivityIcon: changes with data freshness
+* - DynamicEfficiencyIcon: changes with efficiency %
+*
+* TYPES:
+* - IconProps: shared props interface
+* - IconColorKey: keys for IconColors
+* - IconSizeKey: keys for IconSize
+*/
+export type { IconProps, IconColorKey, IconSizeKey };
+export { createIcon }; 

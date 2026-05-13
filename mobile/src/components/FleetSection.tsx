@@ -51,7 +51,7 @@ function AddVehicleModal({ visible, fleetId, onClose, onAdded }: {
         nickname:       nickname.trim() || null,
         monthlyLimit:   monthlyLimit ? parseFloat(monthlyLimit) : null,
       });
-      Alert.alert('✅ Vehicle Added',
+      Alert.alert('Vehicle Added',
         `${regNo.toUpperCase()} added to fleet.\nOCPP tag generated automatically.`);
       setRegNo(''); setNickname(''); setMonthlyLimit('');
       onAdded();
@@ -107,7 +107,7 @@ function AddVehicleModal({ visible, fleetId, onClose, onAdded }: {
 
             <View style={m.infoBox}>
               <Text style={m.infoText}>
-                ℹ️ An OCPP ID tag will be generated automatically for this
+                An OCPP ID tag will be generated automatically for this
                 vehicle and registered in the charging network.
               </Text>
             </View>
@@ -215,7 +215,7 @@ function CreateFleetForm({ onCreated }: { onCreated: () => void }) {
         gstNumber:    gst.trim() || null,
         contactEmail: contactEmail.trim(),
       });
-      Alert.alert('✅ Fleet Created', `${name} is now active.`);
+      Alert.alert('Fleet Created', `${name} is now active.`);
       onCreated();
     } catch (err: any) {
       Alert.alert('Failed', err?.response?.data?.error || 'Could not create fleet');
@@ -260,7 +260,6 @@ function CreateFleetForm({ onCreated }: { onCreated: () => void }) {
               style={[cf.modeCard, isActive && cf.modeCardActive]}
               onPress={() => setBillingMode(opt.key)}>
               
-              {/* */}
               <View style={cf.modeLabelRow}>
                 <Icon size={18} color={isActive ? '#22d3ee' : '#94a3b8'} />
                 <Text style={[cf.modeLabel, isActive && cf.modeLabelActive]}>
@@ -423,17 +422,53 @@ export default function FleetSection({ userId }: { userId: number }) {
 
   return (
     <View style={s.card}>
-      {/* Header */}
-      <TouchableOpacity style={s.cardHeader}
-        onPress={() => setExpanded(!expanded)}>
-        <View>
-          <Text style={s.cardTitle}>🏢 {fleet.fleet_name}</Text>
-          <Text style={s.cardSub}>
-            {fleet.billing_mode === 'fleet_pays' ? '🏦 Fleet billing' : '👤 Driver billing'}
-            {fleet.monthly_budget ? ` · ₹${fleet.monthly_budget}/mo budget` : ''}
-          </Text>
+      <TouchableOpacity
+        style={s.cardHeader}
+        onPress={() => setExpanded(!expanded)}
+      >
+        <View style={{ flex: 1 }}>
+          
+          <View style={s.sectionTitleRow}>
+            <AppIcon.FleetBuilding size={20} color="#22d3ee" />
+            
+            <Text style={s.cardTitle}>
+              {fleet.fleet_name}
+            </Text>
+          </View>
+      
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginTop: 4,
+            }}
+          >
+            {fleet.billing_mode === 'fleet_pays' ? (
+              <AppIcon.Wallet size={14} color="#64748b" />
+            ) : (
+              <AppIcon.User size={14} color="#64748b" />
+            )}
+      
+            <Text style={s.cardSub}>
+              {' '}
+              {fleet.billing_mode === 'fleet_pays'
+                ? 'Fleet billing'
+                : 'Driver billing'}
+      
+              {fleet.monthly_budget
+                ? ` · ₹${fleet.monthly_budget}/mo budget`
+                : ''}
+            </Text>
+          </View>
         </View>
-        <Text style={s.chevron}>{expanded ? '▲' : '▼'}</Text>
+      
+        <AppIcon.ChevronRight
+          size={18}
+          color="#64748b"
+          style={{
+            transform: [{ rotate: expanded ? '90deg' : '0deg' }],
+          }}
+        />
       </TouchableOpacity>
 
       {expanded && (

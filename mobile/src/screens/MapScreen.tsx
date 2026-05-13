@@ -13,41 +13,46 @@ import { useFilterStore } from '../store/filterStore';
 import AssistantChat from '../components/AssistantChat';
 import { api } from '../utils/api';
 
-// ✅ Import icon system
-import { AppIcon, IconColors, IconSize } from '../components/icons';
+// Import new Icon System
+import { 
+  AppIcon, IconColors, IconSize, 
+  DynamicStatusIcon 
+} from '../components/icons';
 
 const STATUS_COLOR: Record<string, string> = {
-  Available:   '#22c55e',
-  Busy:        '#f59e0b',
-  Charging:    '#3b82f6',
-  Reserved:    '#f59e0b',
-  Occupied:    '#f59e0b',
-  Faulted:     '#ef4444',
+  Available: '#22c55e',
+  Busy: '#f59e0b',
+  Charging: '#3b82f6',
+  Reserved: '#f59e0b',
+  Occupied: '#f59e0b',
+  Faulted: '#ef4444',
   Unavailable: '#6b7280',
-  Offline:     '#6b7280',
-  Unknown:     '#6b7280',
+  Offline: '#6b7280',
+  Unknown: '#6b7280',
 };
 
 const POWER_OPTIONS = [
-  { label: 'All',     value: 0   },
-  { label: '7+ kW',  value: 7   },
-  { label: '22+ kW', value: 22  },
-  { label: '50+ kW', value: 50  },
+  { label: 'All', value: 0 },
+  { label: '7+ kW', value: 7 },
+  { label: '22+ kW', value: 22 },
+  { label: '50+ kW', value: 50 },
   { label: '150+ kW',value: 150 },
 ];
 
 const PRICE_OPTIONS = [
-  { label: 'Any',  value: 999 },
-  { label: '≤₹8',  value: 8   },
-  { label: '≤₹10', value: 10  },
-  { label: '≤₹15', value: 15  },
-  { label: '≤₹20', value: 20  },
+  { label: 'Any', value: 999 },
+  { label: '≤₹8', value: 8 },
+  { label: '≤₹10', value: 10 },
+  { label: '≤₹15', value: 15 },
+  { label: '≤₹20', value: 20 },
 ];
 
 // ─────────────────────────────────────────────────────
-// ChargerMarker - Icons instead of emojis
+// ChargerMarker - Pure View/Text for Map Performance
+// Do NOT use DynamicStatusIcon here
 // ─────────────────────────────────────────────────────
-const MARKER_W = 44;const MARKER_H = 48;
+const MARKER_W = 44;
+const MARKER_H = 48;
 
 const ChargerMarker = React.memo(({ charger, onPress, isReserved }: {
   charger: Charger;
@@ -57,11 +62,11 @@ const ChargerMarker = React.memo(({ charger, onPress, isReserved }: {
   const [rendered, setRendered] = useState(false);
 
   const bgColor =
-    isReserved              ? '#7c3aed' :
+    isReserved ? '#7c3aed' : // purple for reserved
     charger.status === 'Available' ? '#10b981' :
-    charger.status === 'Busy'      ? '#f59e0b' :
-    charger.status === 'Charging'  ? '#3b82f6' :
-    charger.status === 'Faulted'   ? '#ef4444' : '#6b7280';
+    charger.status === 'Busy' ? '#f59e0b' :
+    charger.status === 'Charging' ? '#3b82f6' :
+    charger.status === 'Faulted' ? '#ef4444' : '#6b7280';
 
   const connectorLabel =
     `${charger.availableConnectors ?? 0}/${charger.totalConnectors ?? 0}`;
@@ -79,12 +84,8 @@ const ChargerMarker = React.memo(({ charger, onPress, isReserved }: {
         onLayout={() => setRendered(true)}
       >
         <View style={[sq.badge, { backgroundColor: bgColor }]}>
-          {/* ✅ Icon instead of emoji */}
-          {isReserved ? (
-            <AppIcon.Clock size={20} color="#fff" />
-          ) : (
-            <AppIcon.Zap size={20} color="#fff" />
-          )}
+          {/* Pure text icon for performance inside Map Marker */}
+          <Text style={sq.icon}>{isReserved ? '🕐' : '⚡'}</Text>
           <Text style={sq.count}>{connectorLabel}</Text>
         </View>
         <View style={[sq.pointer, { borderTopColor: bgColor }]} />
@@ -93,12 +94,12 @@ const ChargerMarker = React.memo(({ charger, onPress, isReserved }: {
   );
 },
 (prev, next) =>
-  prev.charger.status              === next.charger.status &&
+  prev.charger.status === next.charger.status &&
   prev.charger.availableConnectors === next.charger.availableConnectors &&
-  prev.charger.totalConnectors     === next.charger.totalConnectors &&
-  prev.isReserved                  === next.isReserved);
+  prev.charger.totalConnectors === next.charger.totalConnectors &&
+  prev.isReserved === next.isReserved
+);
 
-// ── Marker styles ─────────────────────────────────────
 const sq = StyleSheet.create({
   badge: {
     width: MARKER_W,
@@ -113,6 +114,12 @@ const sq = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 4,
     elevation: 6,
+  },
+  icon: {
+    fontSize: 20,
+    color: '#fff',
+    marginBottom: 1,
+    includeFontPadding: false,
   },
   count: {
     fontSize: 11,
@@ -133,18 +140,19 @@ const sq = StyleSheet.create({
   },
 });
 
-// ── PricingCard ───────────────────────────────────────
+// ── PricingCard (Updated with Icons) ──────────────────
 function PricingCard({ charger, connectorId, user }: {
   charger: Charger;
   connectorId: number | null;
   user: any;
 }) {
   const [estimate, setEstimate] = useState<any>(null);
-  const [loading,  setLoading]  = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!connectorId) { setEstimate(null); return; }
     if (!charger.pricing) return;
+
     setLoading(true);
     const params = new URLSearchParams({
       connectorId: connectorId.toString(),
@@ -165,7 +173,6 @@ function PricingCard({ charger, connectorId, user }: {
   if (!charger.pricing) {
     return (
       <View style={pc.card}>
-        {/* ✅ Icon + Text instead of emoji */}
         <View style={pc.titleRow}>
           <AppIcon.Rupee size={IconSize.md} color={IconColors.info} />
           <Text style={pc.title}>Pricing</Text>
@@ -194,7 +201,8 @@ function PricingCard({ charger, connectorId, user }: {
           <Text style={pc.feeText}>
             + ₹{pricing.sessionFee.toFixed(0)} session fee
           </Text>
-        </View>      )}
+        </View>
+      )}
 
       {!!pricing.tiers?.length && (
         <View style={pc.tiers}>
@@ -223,7 +231,6 @@ function PricingCard({ charger, connectorId, user }: {
 
       {connectorId && estimate && !loading && (
         <View style={pc.estimate}>
-          {/* ✅ Icon + Text instead of emoji */}
           <View style={pc.estimateTitleRow}>
             <AppIcon.TrendingUp size={IconSize.sm} color={IconColors.muted} />
             <Text style={pc.estimateTitle}>Your Estimate</Text>
@@ -243,7 +250,8 @@ function PricingCard({ charger, connectorId, user }: {
                     ~{estimate.estimatedDuration} min
                   </Text>
                 </View>
-              )}              <Text style={pc.breakdown}>{estimate.breakdown}</Text>
+              )}
+              <Text style={pc.breakdown}>{estimate.breakdown}</Text>
             </>
           ) : (
             <Text style={pc.noVehicle}>
@@ -256,7 +264,7 @@ function PricingCard({ charger, connectorId, user }: {
   );
 }
 
-// ── Filter Sheet ──────────────────────────────────────
+// ── Filter Sheet (Updated with Icons) ─────────────────
 function FilterSheet({ visible, onClose }: {
   visible: boolean; onClose: () => void;
 }) {
@@ -279,26 +287,37 @@ function FilterSheet({ visible, onClose }: {
 
       <Text style={fs.label}>Availability</Text>
       <View style={fs.row}>
-        {(['all', 'available'] as const).map(v => (
-          <TouchableOpacity key={v}
-            style={[fs.chip, filters.availability === v && fs.chipActive]}
-            onPress={() => setFilters({ availability: v })}>
-            <Text style={[fs.chipText,
-              filters.availability === v && fs.chipTextActive]}>
-              {/* ✅ Icon + Text instead of emoji */}
-              {v === 'all' ? (
-                <View style={fs.chipContent}>
-                  <AppIcon.Plug size={IconSize.xs} color="#64748b" />
-                  <Text>All</Text>
-                </View>
-              ) : (
-                <View style={fs.chipContent}>                  <AppIcon.Success size={IconSize.xs} color="#10b981" />
-                  <Text>Available Only</Text>
-                </View>
-              )}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {(['all', 'available'] as const).map(v => {
+          const active = filters.availability === v;
+          return (
+            <TouchableOpacity
+              key={v}
+              style={[
+                fs.chip,
+                active && fs.chipActive,
+              ]}
+              onPress={() => setFilters({ availability: v })}
+            >
+              <View style={fs.chipContent}>
+                {v === 'all' ? (
+                  <>
+                    <AppIcon.Plug size={IconSize.s} color={active ? '#ffffff' : '#64748b'}/>
+                    <Text style={[ fs.chipText, active && fs.chipTextActive, ]}>
+                      All
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <AppIcon.Success size={IconSize.s} color={active ? '#ffffff' : '#64748b'}/>
+                    <Text style={[ fs.chipText, active && fs.chipTextActive, ]} >
+                      Available Only
+                    </Text>
+                  </>
+                )}
+              </View>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       <Text style={fs.label}>Minimum Power</Text>
@@ -341,7 +360,8 @@ function FilterSheet({ visible, onClose }: {
             <Text style={[fs.chipText,
               filters.maxPrice === opt.value && fs.chipTextActive]}>
               {opt.label}
-            </Text>          </TouchableOpacity>
+            </Text>
+          </TouchableOpacity>
         ))}
       </ScrollView>
 
@@ -369,17 +389,17 @@ export default function MapScreen({ navigation }: any) {
   const { user } = useAuthStore();
   const { filters, setFilters, showFilterSheet, toggleFilterSheet } = useFilterStore();
 
-  const [selected, setSelected]                     = useState<Charger | null>(null);
-  const [modalVisible, setModalVisible]             = useState(false);
-  const [selectedConnector, setSelectedConnector]   = useState<number | null>(null);
-  const [starting, setStarting]                     = useState(false);
-  const [reserving, setReserving]                   = useState(false);
-  const [activeReservation, setActiveReservation]   = useState<any>(null);
+  const [selected, setSelected] = useState<Charger | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedConnector, setSelectedConnector] = useState<number | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [reserving, setReserving] = useState(false);
+  const [activeReservation, setActiveReservation] = useState<any>(null);
 
   const startingRef = useRef(false);
-  const mapRef      = useRef<MapView>(null);
+  const mapRef = useRef<MapView>(null);
 
-  const reservedChargeBoxId = activeReservation?.chargeBoxBoxId ?? null;
+  const reservedChargeBoxId = activeReservation?.chargeBoxId ?? null;
 
   const filteredChargers = useMemo(() =>
     (chargers || []).filter(c => {
@@ -390,7 +410,8 @@ export default function MapScreen({ navigation }: any) {
       if (filters.maxDistance < 999 && c.distance != null
         && c.distance > filters.maxDistance)
         return false;
-      if (filters.maxPrice < 999 && c.pricing?.ratePerKwh != null        && c.pricing.ratePerKwh > filters.maxPrice)
+      if (filters.maxPrice < 999 && c.pricing?.ratePerKwh != null
+        && c.pricing.ratePerKwh > filters.maxPrice)
         return false;
       return true;
     }),
@@ -433,13 +454,14 @@ export default function MapScreen({ navigation }: any) {
     if (!userLocation?.latitude || !mapRef.current) return;
     setTimeout(() => {
       mapRef.current?.animateToRegion({
-        latitude:      userLocation.latitude,
-        longitude:     userLocation.longitude,
-        latitudeDelta:  0.1,
+        latitude: userLocation.latitude,
+        longitude: userLocation.longitude,
+        latitudeDelta: 0.1,
         longitudeDelta: 0.1,
       }, 1000);
     }, 800);
   }, [userLocation?.latitude, userLocation?.longitude]);
+
   useEffect(() => {
     if (userLocation?.latitude) return;
     if (!filteredChargers.length || !mapRef.current) return;
@@ -479,7 +501,7 @@ export default function MapScreen({ navigation }: any) {
         [{ text: 'OK' }]
       );
       return;
-    }	  
+    }   
     if (startingRef.current) return;
     if (!selected || !selectedConnector) {
       Alert.alert('Select Connector', 'Please select a connector first.');
@@ -488,7 +510,8 @@ export default function MapScreen({ navigation }: any) {
     if (activeSession) {
       Alert.alert('Active Session',
         'You already have an active charging session.');
-      return;    }
+      return;
+    }
 
     startingRef.current = true;
     setStarting(true);
@@ -505,7 +528,7 @@ export default function MapScreen({ navigation }: any) {
         setStarting(false);
         startingRef.current = false;
         return;
-      }	  
+      }   
       await startSession(selected.chargeBoxId, selectedConnector, idTag);
       setModalVisible(false);
       setSelectedConnector(null);
@@ -519,7 +542,7 @@ export default function MapScreen({ navigation }: any) {
       const isTimeout = err?.code === 'ECONNABORTED'
         || err?.message?.includes('timeout')
         || err?.message?.includes('Network Error');
-	  const isInsufficientBalance =
+   const isInsufficientBalance =
         err?.response?.status === 402 ||
         err?.response?.data?.code === 'INSUFFICIENT_BALANCE';
 
@@ -537,7 +560,8 @@ export default function MapScreen({ navigation }: any) {
               }
             },
             { text: 'Cancel', style: 'cancel' }
-          ]        );
+          ]
+        );
         return;
       }
   
@@ -565,7 +589,7 @@ export default function MapScreen({ navigation }: any) {
         [{ text: 'OK' }]
       );
       return;
-    }	  
+    }   
     if (!selected || !selectedConnector) return;
     setReserving(true);
     try {
@@ -586,7 +610,8 @@ export default function MapScreen({ navigation }: any) {
       setModalVisible(false);
       Alert.alert(
         'Reserved',
-        `Connector #${selectedConnector} on ${selected.chargeBoxId} is held for 30 minutes.`      );
+        `Connector #${selectedConnector} on ${selected.chargeBoxId} is held for 30 minutes.`
+      );
     } catch (err: any) {
       Alert.alert('Failed', err?.response?.data?.error || 'Could not reserve');
     } finally {
@@ -608,20 +633,16 @@ export default function MapScreen({ navigation }: any) {
           onPress: async () => {
             try {
               await api.delete(`/api/reservations/${activeReservation.id}`);
-
               setActiveReservation(null);
-
               await fetchChargers();
               const freshChargers = useChargerStore.getState().chargers;
               const updatedCharger = freshChargers.find(
                 c => c.chargeBoxId === selected?.chargeBoxId
               );
               if (updatedCharger) setSelected(updatedCharger);
-
               Alert.alert('Cancelled', 'Your reservation has been cancelled.');
             } catch (err: any) {
-              Alert.alert('Failed',
-                err?.response?.data?.error || 'Could not cancel reservation');
+              Alert.alert('Failed', err?.response?.data?.error || 'Could not cancel reservation');
             }
           },
         },
@@ -635,7 +656,8 @@ export default function MapScreen({ navigation }: any) {
         const c = (chargers || []).find(x => x.chargeBoxId === action.chargeBoxId);
         if (c) {
           setSelected(c);
-          setModalVisible(true);          mapRef.current?.animateToRegion({
+          setModalVisible(true);
+          mapRef.current?.animateToRegion({
             latitude: c.latitude, longitude: c.longitude,
             latitudeDelta: 0.05, longitudeDelta: 0.05,
           }, 800);
@@ -679,12 +701,12 @@ export default function MapScreen({ navigation }: any) {
         <TouchableOpacity
           style={[s.filterBtn, activeFilterCount > 0 && s.filterBtnActive]}
           onPress={toggleFilterSheet}>
-          {/* ✅ Icon instead of emoji */}
           <AppIcon.Filter size={IconSize.sm} color={activeFilterCount > 0 ? IconColors.primary : '#94a3b8'} />
           <Text style={[s.filterTxt, activeFilterCount > 0 && s.filterTxtActive]}>
             Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
           </Text>
         </TouchableOpacity>
+
         <View style={s.countBadge}>
           <Text style={s.countTxt}>
             {filteredChargers.length}/{chargers?.length || 0} chargers
@@ -728,12 +750,13 @@ export default function MapScreen({ navigation }: any) {
       <View style={s.legend}>
         {[
           ['Available', '#22c55e'],
-          ['Busy',      '#f59e0b'],
-          ['Faulted',   '#ef4444'],
-          ['Reserved',  '#7c3aed'],
-          ['Offline',   '#6b7280'],
+          ['Busy', '#f59e0b'],
+          ['Faulted', '#ef4444'],
+          ['Reserved', '#7c3aed'],
+          ['Offline', '#6b7280'],
         ].map(([label, color]) => (
-          <View key={label} style={s.legendItem}>            <View style={[s.legendDot, { backgroundColor: color }]} />
+          <View key={label} style={s.legendItem}>
+            <View style={[s.legendDot, { backgroundColor: color }]} />
             <Text style={s.legendText}>{label}</Text>
           </View>
         ))}
@@ -782,7 +805,8 @@ export default function MapScreen({ navigation }: any) {
                 {selected.distance != null && (
                   <View style={s.infoRow}>
                     <AppIcon.Navigation size={IconSize.sm} color={IconColors.muted} />
-                    <Text style={s.infoText}>                      {selected.distance < 1
+                    <Text style={s.infoText}>
+                      {selected.distance < 1
                         ? `${Math.round(selected.distance * 1000)}m away`
                         : `${selected.distance.toFixed(1)}km away`}
                     </Text>
@@ -793,19 +817,21 @@ export default function MapScreen({ navigation }: any) {
                   <Text style={s.infoText}>
                     {selected.availableConnectors}/{selected.totalConnectors} available
                     {selected.maxPower
-                      ? `  ·  ${(selected.maxPower / 1000).toFixed(0)} kW max`
+                      ? ` · ${(selected.maxPower / 1000).toFixed(0)} kW max`
                       : ''}
                   </Text>
                 </View>
 
-                {/* Status + Navigate */}
+                {/* Status + Navigate - Using DynamicStatusIcon here (Modal is safe) */}
                 <View style={s.actionRow}>
                   <View style={[s.statusBadge,
                     { backgroundColor:
                         (STATUS_COLOR[selected.status] || '#6b7280') + '22' }]}>
-                    <View style={[s.statusDot,
-                      { backgroundColor:
-                          STATUS_COLOR[selected.status] || '#6b7280' }]} />
+                    <DynamicStatusIcon 
+                      status={selected.status}
+                      isReserved={reservedChargeBoxId === selected.chargeBoxId}
+                      size={IconSize.sm}
+                    />
                     <Text style={[s.statusText,
                       { color: STATUS_COLOR[selected.status] || '#6b7280' }]}>
                       {selected.status}
@@ -831,7 +857,8 @@ export default function MapScreen({ navigation }: any) {
                 {activeReservation?.chargeBoxId === selected?.chargeBoxId && (
                   <View style={s.reservationBanner}>
                     <View>
-                      <View style={s.reservationBannerTextRow}>                        <AppIcon.Clock size={IconSize.xs} color={IconColors.primary} />
+                      <View style={s.reservationBannerTextRow}>
+                        <AppIcon.Clock size={IconSize.xs} color={IconColors.primary} />
                         <Text style={s.reservationBannerText}>
                           Your reservation is active
                         </Text>
@@ -855,13 +882,13 @@ export default function MapScreen({ navigation }: any) {
                 <Text style={s.sectionTitle}>SELECT CONNECTOR</Text>
                 <View style={s.connectorGrid}>
                   {(selected.connectors || []).map(conn => {
-                    const available   = conn.status === 'Available';
-                    const isReserved  = conn.status === 'Reserved';
-                    const isMyRes     =
+                    const available = conn.status === 'Available';
+                    const isReserved = conn.status === 'Reserved';
+                    const isMyRes =
                       activeReservation?.chargeBoxId === selected.chargeBoxId &&
                       activeReservation?.connectorId === conn.connectorId;
-                    const isSel       = selectedConnector === conn.connectorId;
-                    const clr         = isMyRes
+                    const isSel = selectedConnector === conn.connectorId;
+                    const clr = isMyRes
                       ? '#7c3aed'
                       : STATUS_COLOR[conn.status] || '#6b7280';
 
@@ -871,8 +898,8 @@ export default function MapScreen({ navigation }: any) {
                         style={[
                           s.connCard,
                           { borderColor: isSel ? '#22d3ee' : clr },
-                          isSel     && s.connCardSel,
-                          isMyRes   && s.connCardMyReserved,
+                          isSel && s.connCardSel,
+                          isMyRes && s.connCardMyReserved,
                           isReserved && !isMyRes && s.connCardReserved,
                           (!available && !isReserved && !isMyRes)
                             && s.connCardDim,
@@ -880,9 +907,10 @@ export default function MapScreen({ navigation }: any) {
                         onPress={() =>
                           (available || isMyRes) &&
                           setSelectedConnector(conn.connectorId)
-                        }                        disabled={!available && !isMyRes}
+                        }
+                        disabled={!available && !isMyRes}
                       >
-                        {/* ✅ Icon instead of emoji */}
+                        {/*  Icon instead of emoji */}
                         {isMyRes ? (
                           <AppIcon.Clock size={20} color="#c4b5fd" />
                         ) : (
@@ -929,7 +957,8 @@ export default function MapScreen({ navigation }: any) {
                         onPress={handleReserve}
                         disabled={reserving}>
                         {reserving
-                          ? <ActivityIndicator color="#22d3ee" />                          : (
+                          ? <ActivityIndicator color="#22d3ee" />
+                          : (
                             <View style={s.reserveBtnContent}>
                               <AppIcon.Clock size={IconSize.sm} color={IconColors.primary} />
                               <Text style={s.reserveBtnTxt}>
@@ -955,7 +984,7 @@ export default function MapScreen({ navigation }: any) {
 // ── Styles ────────────────────────────────────────────
 const s = StyleSheet.create({
   container: { flex: 1 },
-  map:       { flex: 1 },
+  map: { flex: 1 },
   topBar: {
     position: 'absolute', top: 16, left: 16, right: 16,
     flexDirection: 'row', justifyContent: 'space-between',
@@ -968,7 +997,7 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: '#334155',
   },
   filterBtnActive: { borderColor: '#22d3ee', backgroundColor: '#0c4a6eee' },
-  filterTxt:       { color: '#94a3b8', fontSize: 13, fontWeight: '600' },
+  filterTxt: { color: '#94a3b8', fontSize: 13, fontWeight: '600' },
   filterTxtActive: { color: '#22d3ee' },
   countBadge: {
     backgroundColor: '#1e293bee', borderRadius: 20,
@@ -978,7 +1007,8 @@ const s = StyleSheet.create({
   offlineBanner: {
     position: 'absolute', top: 60, left: 16, right: 16,
     backgroundColor: '#78350f', borderRadius: 10,
-    padding: 12, borderWidth: 1, borderColor: '#d97706',  },
+    padding: 12, borderWidth: 1, borderColor: '#d97706',
+  },
   offlineTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1016,7 +1046,7 @@ const s = StyleSheet.create({
     padding: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 8,
   },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  legendDot:  { width: 8, height: 8, borderRadius: 4 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
   legendText: { color: '#cbd5e1', fontSize: 10 },
   loadingBadge: {
     position: 'absolute', top: 60, right: 16,
@@ -1027,7 +1057,8 @@ const s = StyleSheet.create({
     backgroundColor: '#00000066',
     justifyContent: 'flex-end',
   },
-  modalOverlay: {    flex: 1, backgroundColor: '#00000088', justifyContent: 'flex-end',
+  modalOverlay: {
+    flex: 1, backgroundColor: '#00000088', justifyContent: 'flex-end',
   },
   modalCard: {
     backgroundColor: '#1e293b', borderTopLeftRadius: 24,
@@ -1038,9 +1069,9 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8,
   },
   modalTitle: { color: '#22d3ee', fontSize: 16, fontWeight: '800' },
-  modalName:  { color: '#94a3b8', fontSize: 12, marginTop: 2 },
-  closeBtn:   { padding: 4, marginLeft: 8 },
-  closeTxt:   { color: '#64748b', fontSize: 20 },
+  modalName: { color: '#94a3b8', fontSize: 12, marginTop: 2 },
+  closeBtn: { padding: 4, marginLeft: 8 },
+  closeTxt: { color: '#64748b', fontSize: 20 },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1056,7 +1087,6 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 6,
     borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
   },
-  statusDot:  { width: 8, height: 8, borderRadius: 4 },
   statusText: { fontWeight: '700', fontSize: 13 },
   navigateBtn: {
     backgroundColor: '#0c4a6e', borderRadius: 10,
@@ -1076,11 +1106,12 @@ const s = StyleSheet.create({
   connectorGrid: {
     flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20,
   },
-  connCard: {    borderWidth: 2, borderRadius: 12, padding: 12,
+  connCard: {
+    borderWidth: 2, borderRadius: 12, padding: 12,
     alignItems: 'center', minWidth: 80, backgroundColor: '#0f172a',
   },
-  connCardSel:        { backgroundColor: '#0c4a6e' },
-  connCardDim:        { opacity: 0.4 },
+  connCardSel: { backgroundColor: '#0c4a6e' },
+  connCardDim: { opacity: 0.4 },
   connCardMyReserved: {
     backgroundColor: '#2e1065',
     borderColor: '#7c3aed',
@@ -1091,8 +1122,8 @@ const s = StyleSheet.create({
     borderColor: '#f59e0b',
     borderWidth: 2,
   },
-  connId:     { color: '#f1f5f9', fontSize: 14, fontWeight: '700' },
-  connDot:    { width: 6, height: 6, borderRadius: 3, marginTop: 4 },
+  connId: { color: '#f1f5f9', fontSize: 14, fontWeight: '700' },
+  connDot: { width: 6, height: 6, borderRadius: 3, marginTop: 4 },
   connStatus: { fontSize: 10, marginTop: 2 },
   connReservedBadge: {
     color: '#c4b5fd', fontSize: 9, fontWeight: '700', marginTop: 2,
@@ -1125,7 +1156,8 @@ const s = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', backgroundColor: '#2e1065',
     borderRadius: 10, padding: 12, marginBottom: 12,
-    borderWidth: 1, borderColor: '#7c3aed',  },
+    borderWidth: 1, borderColor: '#7c3aed',
+  },
   reservationBannerTextRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1138,7 +1170,6 @@ const s = StyleSheet.create({
   reservationCancelText: { color: '#f87171', fontSize: 13, fontWeight: '600' },
 });
 
-// ── PricingCard styles ────────────────────────────────
 const pc = StyleSheet.create({
   card: {
     backgroundColor: '#0f172a', borderRadius: 12,
@@ -1154,27 +1185,28 @@ const pc = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  title:    { color: '#60a5fa', fontSize: 13, fontWeight: '700' },
+  title: { color: '#60a5fa', fontSize: 13, fontWeight: '700' },
   rateName: { color: '#475569', fontSize: 12 },
-  rate:     { color: '#22d3ee', fontSize: 20, fontWeight: '800', marginBottom: 6 },
+  rate: { color: '#22d3ee', fontSize: 20, fontWeight: '800', marginBottom: 6 },
   feeRow: {
     backgroundColor: '#1c1a0e', borderRadius: 6,
     paddingHorizontal: 10, paddingVertical: 4,
     alignSelf: 'flex-start', marginBottom: 8,
   },
-  feeText:    { color: '#fbbf24', fontSize: 11, fontWeight: '600' },
-  tiers:      { gap: 3, marginBottom: 8 },
+  feeText: { color: '#fbbf24', fontSize: 11, fontWeight: '600' },
+  tiers: { gap: 3, marginBottom: 8 },
   tiersTitle: { color: '#475569', fontSize: 10, marginBottom: 4 },
-  tierRow:    { flexDirection: 'row', justifyContent: 'space-between' },
-  tierLabel:  { color: '#64748b', fontSize: 12 },
-  tierRate:   { color: '#94a3b8', fontSize: 12, fontWeight: '600' },
+  tierRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  tierLabel: { color: '#64748b', fontSize: 12 },
+  tierRate: { color: '#94a3b8', fontSize: 12, fontWeight: '600' },
   hint: {
     color: '#334155', fontSize: 11, fontStyle: 'italic', marginTop: 6,
   },
   estimateLoading: {
     flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8,
   },
-  estimateLoadingText: { color: '#475569', fontSize: 12 },  estimate: {
+  estimateLoadingText: { color: '#475569', fontSize: 12 },
+  estimate: {
     backgroundColor: '#1e293b', borderRadius: 8, padding: 10, marginTop: 8,
   },
   estimateTitleRow: {
@@ -1192,11 +1224,10 @@ const pc = StyleSheet.create({
   },
   estimateLabel: { color: '#64748b', fontSize: 13 },
   estimateValue: { color: '#f1f5f9', fontSize: 13, fontWeight: '700' },
-  breakdown:  { color: '#475569', fontSize: 11, marginTop: 6, lineHeight: 16 },
-  noVehicle:  { color: '#475569', fontSize: 12, fontStyle: 'italic' },
+  breakdown: { color: '#475569', fontSize: 11, marginTop: 6, lineHeight: 16 },
+  noVehicle: { color: '#475569', fontSize: 12, fontStyle: 'italic' },
 });
 
-// ── FilterSheet styles ────────────────────────────────
 const fs = StyleSheet.create({
   sheet: {
     backgroundColor: '#1e293b', borderTopLeftRadius: 24,
@@ -1213,17 +1244,18 @@ const fs = StyleSheet.create({
     color: '#64748b', fontSize: 11, fontWeight: '600',
     textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8,
   },
-  row:      { flexDirection: 'row', gap: 8, marginBottom: 20 },
+  row: { flexDirection: 'row', gap: 8, marginBottom: 20 },
   chipScroll: { marginBottom: 20 },
   chip: {
     backgroundColor: '#0f172a', borderRadius: 20,
     paddingHorizontal: 14, paddingVertical: 8,
     marginRight: 8, borderWidth: 1, borderColor: '#334155',
   },
-  chipActive:     { backgroundColor: '#0c4a6e', borderColor: '#22d3ee' },
+  chipActive: { backgroundColor: '#0c4a6e', borderColor: '#22d3ee' },
   chipContent: {
     flexDirection: 'row',
-    alignItems: 'center',    gap: 4,
+    alignItems: 'center',
+    gap: 4,
   },
   chipText: {
     color: '#64748b', fontSize: 13,
@@ -1231,7 +1263,7 @@ const fs = StyleSheet.create({
     alignItems: 'center',
   },
   chipTextActive: { color: '#22d3ee', fontWeight: '600' },
-  actions:  { flexDirection: 'row', gap: 12, marginTop: 8 },
+  actions: { flexDirection: 'row', gap: 12, marginTop: 8 },
   resetBtn: {
     flex: 1, backgroundColor: '#0f172a', borderRadius: 12,
     padding: 14, alignItems: 'center',

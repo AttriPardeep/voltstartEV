@@ -78,12 +78,12 @@ export const useAuthStore = create<AuthState>((set) => ({
   // LOGIN — map API response including idTag
   login: async (username, password) => {
     set({ isLoading: true });
-console.log('🔐 Login attempt:', { username });
+console.log(' Login attempt:', { username });
     try {
       const res = await api.post('/api/users/login', { username, password });
       const { token, user: apiUser } = res.data.data;
 // ✅ LOG: What API returned
-console.log('📥 Login API response:', {
+console.log(' Login API response:', {
       userId: apiUser.userId,
       username: apiUser.username,
       idTag: apiUser.idTag,
@@ -114,7 +114,7 @@ console.log('📥 Login API response:', {
         updatedAt: apiUser.updatedAt,
       };
 // ✅ LOG: What we're storing
-console.log('💾 Storing user in auth store:', {
+console.log(' Storing user in auth store:', {
       userId: userData.userId,
       username: userData.username,
       idTag: userData.idTag
@@ -128,7 +128,7 @@ console.log('💾 Storing user in auth store:', {
 
 // ✅ LOG: Verify storage
 const storedUser = await AsyncStorage.getItem('auth_user');
-    console.log('✅ User stored in AsyncStorage:', 
+    console.log(' User stored in AsyncStorage:', 
       storedUser ? JSON.parse(storedUser).idTag : 'NULL'
     );
 	
